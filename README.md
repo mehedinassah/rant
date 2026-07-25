@@ -8,10 +8,11 @@ software engineering ecosystem where every action ripples through the whole
 system.
 
 > Status: **early foundation.** Auth · Organizations · Workspaces · Projects,
-> plus a Linear-style project board (Sprints · Epics · Issues · Comments), all
-> implemented end-to-end with RBAC + audit logging. The remaining modules from
-> the system design (Repositories, CI/CD, Deployments, Monitoring, AI Copilot,
-> Billing, …) are on the roadmap.
+> a Linear-style project board (Sprints · Epics · Issues · Comments), and a
+> GitHub-style repository module (Repos · Branches · Commits · Tags · Releases ·
+> Pull Requests · Reviews · Merge Queue) — all implemented end-to-end with RBAC
+> + audit logging. The remaining modules from the system design (CI/CD,
+> Deployments, Monitoring, AI Copilot, Billing, …) are on the roadmap.
 
 ---
 
@@ -113,6 +114,24 @@ Base URL: `/api/v1`
 **Comments** — `GET|POST .../issues/:issueId/comments` ·
 `DELETE .../comments/:commentId` (author or MANAGER+)
 
+**Repositories** — `GET|POST /organizations/:orgId/repositories` ·
+`GET|PATCH|DELETE .../repositories/:repoId`
+
+**Branches** — `GET|POST .../:repoId/branches` · `DELETE .../branches/:name`
+
+**Commits** — `GET|POST .../:repoId/commits` (advances branch head) ·
+`GET .../commits/:sha`
+
+**Tags / Releases** — `GET|POST .../:repoId/tags` · `DELETE .../tags/:name` ·
+`GET|POST .../:repoId/releases` · `DELETE .../releases/:releaseId`
+
+**Pull Requests** — `GET|POST .../:repoId/pulls` · `GET|PATCH .../pulls/:number` ·
+`GET|POST .../pulls/:number/reviews` · `POST .../pulls/:number/merge`
+(gated on reviews — blocks if changes requested)
+
+**Merge Queue** — `POST|DELETE .../pulls/:number/queue` (enqueue/dequeue) ·
+`GET .../:repoId/merge-queue` · `POST .../merge-queue/process`
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -122,6 +141,6 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Repositories · Documentation · API Platform · CI/CD · Deployments · Monitoring ·
+Documentation · API Platform · CI/CD · Deployments · Monitoring ·
 Notifications · AI Copilot · Analytics · Billing · Audit UI · Search · Files ·
 Team Chat · Integrations.

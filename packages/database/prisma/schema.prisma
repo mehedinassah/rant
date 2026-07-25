@@ -85,6 +85,25 @@ enum IssuePriority {
   URGENT
 }
 
+enum RepositoryVisibility {
+  PRIVATE
+  INTERNAL
+  PUBLIC
+}
+
+enum PullRequestStatus {
+  DRAFT
+  OPEN
+  MERGED
+  CLOSED
+}
+
+enum ReviewState {
+  APPROVED
+  CHANGES_REQUESTED
+  COMMENTED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -107,6 +126,11 @@ model User {
   assignedIssues Issue[]                  @relation("IssueAssignee")
   reportedIssues Issue[]                  @relation("IssueReporter")
   comments       Comment[]
+  commits             Commit[]      @relation("CommitAuthor")
+  releases            Release[]     @relation("ReleaseAuthor")
+  pullRequests        PullRequest[] @relation("PrAuthor")
+  mergedPullRequests  PullRequest[] @relation("PrMergedBy")
+  reviews             Review[]      @relation("ReviewAuthor")
 
   @@map("users")
 }
@@ -141,10 +165,11 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner       User                     @relation("OrgOwner", fields: [ownerId], references: [id])
-  memberships OrganizationMembership[]
-  workspaces  Workspace[]
-  auditLogs   AuditLog[]
+  owner        User                     @relation("OrgOwner", fields: [ownerId], references: [id])
+  memberships  OrganizationMembership[]
+  workspaces   Workspace[]
+  repositories Repository[]
+  auditLogs    AuditLog[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -207,10 +232,11 @@ model Project {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sprints   Sprint[]
-  epics     Epic[]
-  issues    Issue[]
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sprints      Sprint[]
+  epics        Epic[]
+  issues       Issue[]
+  repositories Repository[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
@@ -305,6 +331,147 @@ model Comment {
 
   @@index([issueId])
   @@map("comments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Repositories (GitHub-style): repos · branches · commits · tags ·
+// releases · pull requests · reviews · merge queue.
+// Metadata layer — commits/SHAs are records, not real git objects.
+// ─────────────────────────────────────────────────────────────
+
+model Repository {
+  id                 String               @id @default(cuid())
+  organizationId     String
+  projectId          String? // optional link to a project
+  name               String
+  slug               String
+  description        String?
+  visibility         RepositoryVisibility @default(PRIVATE)
+  defaultBranch      String               @default("main")
+  /// Monotonic counter used to mint PR numbers (#1, #2, ...).
+  pullRequestCounter Int                  @default(0)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  branches     Branch[]
+  commits      Commit[]
+  tags         Tag[]
+  releases     Release[]
+  pullRequests PullRequest[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("repositories")
+}
+
+model Branch {
+  id            String   @id @default(cuid())
+  repositoryId  String
+  name          String
+  headCommitSha String?
+  isDefault     Boolean  @default(false)
+  isProtected   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, name])
+  @@index([repositoryId])
+  @@map("branches")
+}
+
+model Commit {
+  id           String   @id @default(cuid())
+  repositoryId String
+  sha          String
+  message      String
+  branch       String
+  parentSha    String?
+  authorId     String
+  createdAt    DateTime @default(now())
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author     User       @relation("CommitAuthor", fields: [authorId], references: [id])
+
+  @@unique([repositoryId, sha])
+  @@index([repositoryId, branch])
+  @@map("commits")
+}
+
+model Tag {
+  id           String   @id @default(cuid())
+  repositoryId String
+  name         String
+  commitSha    String
+  createdAt    DateTime @default(now())
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, name])
+  @@index([repositoryId])
+  @@map("tags")
+}
+
+model Release {
+  id           String   @id @default(cuid())
+  repositoryId String
+  tagName      String
+  name         String
+  body         String?
+  isPrerelease Boolean  @default(false)
+  authorId     String
+  publishedAt  DateTime @default(now())
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author     User       @relation("ReleaseAuthor", fields: [authorId], references: [id])
+
+  @@unique([repositoryId, tagName])
+  @@index([repositoryId])
+  @@map("releases")
+}
+
+model PullRequest {
+  id             String            @id @default(cuid())
+  repositoryId   String
+  number         Int
+  title          String
+  description    String?
+  sourceBranch   String
+  targetBranch   String
+  status         PullRequestStatus @default(OPEN)
+  authorId       String
+  mergedById     String?
+  mergeCommitSha String?
+  mergedAt       DateTime?
+  mergeQueuedAt  DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author     User       @relation("PrAuthor", fields: [authorId], references: [id])
+  mergedBy   User?      @relation("PrMergedBy", fields: [mergedById], references: [id], onDelete: SetNull)
+  reviews    Review[]
+
+  @@unique([repositoryId, number])
+  @@index([repositoryId, status])
+  @@map("pull_requests")
+}
+
+model Review {
+  id            String      @id @default(cuid())
+  pullRequestId String
+  reviewerId    String
+  state         ReviewState
+  body          String?
+  createdAt     DateTime    @default(now())
+
+  pullRequest PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  reviewer    User        @relation("ReviewAuthor", fields: [reviewerId], references: [id])
+
+  @@index([pullRequestId])
+  @@map("reviews")
 }
 
 // ─────────────────────────────────────────────────────────────

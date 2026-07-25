@@ -13,6 +13,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { SprintsModule } from './modules/sprints/sprints.module';
 import { EpicsModule } from './modules/epics/epics.module';
 import { IssuesModule } from './modules/issues/issues.module';
+import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -31,6 +32,7 @@ import { HealthController } from './health.controller';
     SprintsModule,
     EpicsModule,
     IssuesModule,
+    RepositoriesModule,
   ],
   controllers: [HealthController],
   providers: [
