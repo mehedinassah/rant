@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { AppEvent, CommitCreatedPayload } from '../../common/events/app-events';
 import { RepositoriesService } from './repositories.service';
 import { CreateCommitDto } from './dto/repository.dto';
 import { generateSha, shortSha } from './git.util';
@@ -11,6 +13,7 @@ export class CommitsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly repos: RepositoriesService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async list(orgId: string, repoId: string, branch?: string) {
@@ -57,6 +60,16 @@ export class CommitsService {
       targetId: commit.id,
       metadata: { sha: shortSha(sha), branch: dto.branch },
     });
+
+    // Ripple out: any pipeline watching this branch's pushes will start a run.
+    const payload: CommitCreatedPayload = {
+      orgId,
+      repoId,
+      branch: dto.branch,
+      commitSha: sha,
+      actorId,
+    };
+    this.events.emit(AppEvent.CommitCreated, payload);
 
     return commit;
   }

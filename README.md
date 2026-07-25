@@ -8,11 +8,15 @@ software engineering ecosystem where every action ripples through the whole
 system.
 
 > Status: **early foundation.** Auth · Organizations · Workspaces · Projects,
-> a Linear-style project board (Sprints · Epics · Issues · Comments), and a
+> a Linear-style project board (Sprints · Epics · Issues · Comments), a
 > GitHub-style repository module (Repos · Branches · Commits · Tags · Releases ·
-> Pull Requests · Reviews · Merge Queue) — all implemented end-to-end with RBAC
-> + audit logging. The remaining modules from the system design (CI/CD,
-> Deployments, Monitoring, AI Copilot, Billing, …) are on the roadmap.
+> Pull Requests · Reviews · Merge Queue), and a GitHub-Actions-style CI/CD engine
+> (Pipelines · Runs · Jobs · Steps · live logs) — all implemented end-to-end with
+> RBAC + audit logging. CI is where the platform starts to *connect*: a commit
+> or an opened PR automatically triggers pipeline runs on a background worker,
+> and a run's result feeds back into the PR merge gate. The remaining modules
+> from the system design (Deployments, Monitoring, AI Copilot, Billing, …) are
+> on the roadmap.
 
 ---
 
@@ -36,10 +40,17 @@ global `JwtAuthGuard` (opt out via `@Public()`) and a global `RolesGuard` that
 resolves org membership from the `:orgId` route param and enforces `@Roles(...)`.
 Every meaningful mutation writes to an immutable `audit_logs` table.
 
+Modules stay decoupled through an internal **event bus** (`@nestjs/event-emitter`):
+one module emits a domain event (`commit.created`, `pull_request.opened`) and
+others react without importing each other. CI/CD listens on that bus and pushes
+work onto a **BullMQ queue** (Redis), where a background worker executes pipeline
+runs step-by-step and streams progress to clients over **Server-Sent Events**.
+
 ## Tech stack
 
-Next.js 15 · NestJS 10 · Prisma 6 · PostgreSQL · Redis · Turborepo · pnpm ·
-TypeScript · argon2 · JWT (access + rotating refresh tokens).
+Next.js 15 · NestJS 10 · Prisma 6 · PostgreSQL · Redis · BullMQ (queue + worker) ·
+Server-Sent Events · Turborepo · pnpm · TypeScript · argon2 ·
+JWT (access + rotating refresh tokens).
 
 ## Prerequisites
 
@@ -81,7 +92,7 @@ pnpm dev
 | `pnpm db:seed`      | Seed demo data                               |
 | `pnpm db:studio`    | Open Prisma Studio                           |
 
-## API surface (Milestone 1)
+## API surface
 
 Base URL: `/api/v1`
 
@@ -132,6 +143,18 @@ Base URL: `/api/v1`
 **Merge Queue** — `POST|DELETE .../pulls/:number/queue` (enqueue/dequeue) ·
 `GET .../:repoId/merge-queue` · `POST .../merge-queue/process`
 
+**Pipelines (CI/CD)** — `GET|POST .../:repoId/pipelines` ·
+`GET|PATCH|DELETE .../pipelines/:pipelineId` ·
+`POST .../pipelines/:pipelineId/run` (manual dispatch). A pipeline holds a
+declarative `{ jobs: [ { name, steps: [ { name, run } ] } ] }` config and
+subscribes to triggers (`PUSH`, `PULL_REQUEST`, `MANUAL`). Pushing a commit or
+opening a PR auto-starts matching runs on a background worker.
+
+**Runs** — `GET .../:repoId/runs` · `GET .../runs/:runId` (jobs + steps + logs) ·
+`GET .../runs/:runId/stream` (Server-Sent Events, live) ·
+`POST .../runs/:runId/cancel`. A PR's newest run must be green before it can
+merge — a failing or in-flight run blocks the merge with `409`.
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -141,6 +164,6 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Documentation · API Platform · CI/CD · Deployments · Monitoring ·
+Documentation · API Platform · Deployments · Monitoring ·
 Notifications · AI Copilot · Analytics · Billing · Audit UI · Search · Files ·
 Team Chat · Integrations.

@@ -4,9 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PullRequestStatus, ReviewState } from '@rant/database';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PullRequestStatus, ReviewState, RunStatus } from '@rant/database';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { AppEvent, PullRequestOpenedPayload } from '../../common/events/app-events';
 import { RepositoriesService } from './repositories.service';
 import {
   CreatePullRequestDto,
@@ -27,6 +29,7 @@ export class PullRequestsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly repos: RepositoriesService,
+    private readonly events: EventEmitter2,
   ) {}
 
   private async findPr(repoId: string, number: number) {
@@ -90,6 +93,17 @@ export class PullRequestsService {
       targetId: pr.id,
       metadata: { number: pr.number, title: pr.title },
     });
+
+    // Ripple out: kick off any PR-triggered CI checks for the source branch.
+    const payload: PullRequestOpenedPayload = {
+      orgId,
+      repoId,
+      pullRequestId: pr.id,
+      prNumber: pr.number,
+      branch: pr.sourceBranch,
+      actorId,
+    };
+    this.events.emit(AppEvent.PullRequestOpened, payload);
 
     return pr;
   }
@@ -200,6 +214,21 @@ export class PullRequestsService {
     };
   }
 
+  /** CI gate: the newest pipeline run for this PR must have succeeded. A PR with
+   *  no runs is allowed through (repos without pipelines behave as before). */
+  private async checksGate(prId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const latest = await this.prisma.pipelineRun.findFirst({
+      where: { pullRequestId: prId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true },
+    });
+    if (!latest || latest.status === RunStatus.SUCCESS) return { ok: true };
+    if (latest.status === RunStatus.FAILED) {
+      return { ok: false, reason: 'Merge blocked: CI checks are failing' };
+    }
+    return { ok: false, reason: 'Merge blocked: CI checks are still running' };
+  }
+
   // ── Merge ─────────────────────────────────────────────────
 
   async merge(orgId: string, repoId: string, number: number, actorId: string) {
@@ -219,6 +248,12 @@ export class PullRequestsService {
     const gate = await this.reviewGate(pr.id);
     if (gate.blocked) {
       return { ok: false as const, reason: 'Merge blocked: changes requested by a reviewer' };
+    }
+
+    // CI gate: the latest pipeline run for this PR must be green.
+    const check = await this.checksGate(pr.id);
+    if (!check.ok) {
+      return { ok: false as const, reason: check.reason };
     }
 
     const target = await this.prisma.branch.findUnique({

@@ -1,7 +1,9 @@
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { BullModule } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuditModule } from './common/audit/audit.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -14,6 +16,7 @@ import { SprintsModule } from './modules/sprints/sprints.module';
 import { EpicsModule } from './modules/epics/epics.module';
 import { IssuesModule } from './modules/issues/issues.module';
 import { RepositoriesModule } from './modules/repositories/repositories.module';
+import { CiModule } from './modules/ci/ci.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -22,6 +25,23 @@ import { HealthController } from './health.controller';
       isGlobal: true,
       // Monorepo root .env (cwd is apps/api at runtime; also try local).
       envFilePath: [join(process.cwd(), '../../.env'), join(process.cwd(), '.env')],
+    }),
+    // Internal event bus — lets modules react to each other's domain events
+    // (e.g. CI starts a run when a commit lands) without importing each other.
+    EventEmitterModule.forRoot(),
+    // BullMQ (Redis-backed) job queue powering the CI/CD worker.
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const url = new URL(config.get<string>('REDIS_URL', 'redis://localhost:6379'));
+        return {
+          connection: {
+            host: url.hostname,
+            port: Number(url.port || 6379),
+            password: url.password || undefined,
+          },
+        };
+      },
     }),
     PrismaModule,
     AuditModule,
@@ -33,6 +53,7 @@ import { HealthController } from './health.controller';
     EpicsModule,
     IssuesModule,
     RepositoriesModule,
+    CiModule,
   ],
   controllers: [HealthController],
   providers: [

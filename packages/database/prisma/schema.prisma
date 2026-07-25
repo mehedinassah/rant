@@ -104,6 +104,24 @@ enum ReviewState {
   COMMENTED
 }
 
+/// What event started a pipeline run.
+enum PipelineTrigger {
+  PUSH
+  PULL_REQUEST
+  MANUAL
+  SCHEDULE
+}
+
+/// Shared lifecycle status for runs, jobs and steps.
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -131,6 +149,7 @@ model User {
   pullRequests        PullRequest[] @relation("PrAuthor")
   mergedPullRequests  PullRequest[] @relation("PrMergedBy")
   reviews             Review[]      @relation("ReviewAuthor")
+  triggeredRuns       PipelineRun[] @relation("RunTriggeredBy")
 
   @@map("users")
 }
@@ -360,6 +379,7 @@ model Repository {
   tags         Tag[]
   releases     Release[]
   pullRequests PullRequest[]
+  pipelines    Pipeline[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -453,6 +473,7 @@ model PullRequest {
   author     User       @relation("PrAuthor", fields: [authorId], references: [id])
   mergedBy   User?      @relation("PrMergedBy", fields: [mergedById], references: [id], onDelete: SetNull)
   reviews    Review[]
+  pipelineRuns PipelineRun[]
 
   @@unique([repositoryId, number])
   @@index([repositoryId, status])
@@ -472,6 +493,96 @@ model Review {
 
   @@index([pullRequestId])
   @@map("reviews")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CI/CD (GitHub-Actions-style): pipelines · runs · jobs · steps.
+// A pipeline is a config attached to a repo; pushes and pull requests
+// trigger runs, which a background worker executes step-by-step. A run's
+// result feeds back into the PR merge gate — the first module where an
+// action in one place (a commit) ripples into another (a blocked merge).
+// ─────────────────────────────────────────────────────────────
+
+model Pipeline {
+  id           String            @id @default(cuid())
+  repositoryId String
+  name         String
+  /// Declarative config: { jobs: [ { name, steps: [ { name, run } ] } ] }.
+  definition   Json
+  /// Which events auto-start this pipeline.
+  triggers     PipelineTrigger[]
+  /// Optional exact branch filter; null = every branch.
+  branchFilter String?
+  isActive     Boolean           @default(true)
+  /// Monotonic counter used to mint per-pipeline run numbers (#1, #2, ...).
+  runCounter   Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  repository Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  runs       PipelineRun[]
+
+  @@unique([repositoryId, name])
+  @@index([repositoryId])
+  @@map("pipelines")
+}
+
+model PipelineRun {
+  id            String          @id @default(cuid())
+  pipelineId    String
+  number        Int
+  status        RunStatus       @default(QUEUED)
+  trigger       PipelineTrigger
+  branch        String
+  commitSha     String?
+  pullRequestId String?
+  triggeredById String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  pipeline    Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pullRequest PullRequest?  @relation(fields: [pullRequestId], references: [id], onDelete: SetNull)
+  triggeredBy User?         @relation("RunTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  jobs        PipelineJob[]
+
+  @@unique([pipelineId, number])
+  @@index([pipelineId, status])
+  @@index([pullRequestId])
+  @@map("pipeline_runs")
+}
+
+model PipelineJob {
+  id         String    @id @default(cuid())
+  runId      String
+  name       String
+  status     RunStatus @default(QUEUED)
+  orderIdx   Int
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  run   PipelineRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  steps PipelineStep[]
+
+  @@index([runId])
+  @@map("pipeline_jobs")
+}
+
+model PipelineStep {
+  id         String    @id @default(cuid())
+  jobId      String
+  name       String
+  command    String
+  status     RunStatus @default(QUEUED)
+  orderIdx   Int
+  logs       String    @default("")
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  job PipelineJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("pipeline_steps")
 }
 
 // ─────────────────────────────────────────────────────────────
