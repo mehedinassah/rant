@@ -7,10 +7,11 @@ software. Not a GitHub clone. Not a Jira clone. Not a Vercel clone — a complet
 software engineering ecosystem where every action ripples through the whole
 system.
 
-> Status: **early foundation.** Milestone 1 (Auth · Organizations · Workspaces ·
-> Projects, with RBAC + audit logging) is implemented end-to-end. The remaining
-> modules from the system design (Repositories, CI/CD, Deployments, Monitoring,
-> AI Copilot, Billing, …) are on the roadmap.
+> Status: **early foundation.** Auth · Organizations · Workspaces · Projects,
+> plus a Linear-style project board (Sprints · Epics · Issues · Comments), all
+> implemented end-to-end with RBAC + audit logging. The remaining modules from
+> the system design (Repositories, CI/CD, Deployments, Monitoring, AI Copilot,
+> Billing, …) are on the roadmap.
 
 ---
 
@@ -97,6 +98,20 @@ Base URL: `/api/v1`
 **Projects** —
 `GET|POST /organizations/:orgId/workspaces/:workspaceId/projects` ·
 `GET|PATCH|DELETE .../projects/:projectId`
+
+**Sprints** — `GET|POST .../projects/:projectId/sprints` ·
+`GET|PATCH|DELETE .../sprints/:sprintId`
+
+**Epics** — `GET|POST .../projects/:projectId/epics` ·
+`GET|PATCH|DELETE .../epics/:epicId`
+
+**Issues** — `GET|POST .../projects/:projectId/issues`
+(filterable by `status`, `type`, `sprintId`, `epicId`, `assigneeId`) ·
+`GET|PATCH|DELETE .../issues/:issueId` · atomic per-project numbering
+(`RANT-123`), subtasks, story points
+
+**Comments** — `GET|POST .../issues/:issueId/comments` ·
+`DELETE .../comments/:commentId` (author or MANAGER+)
 
 ## Roles (RBAC)
 

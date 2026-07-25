@@ -10,6 +10,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { SprintsModule } from './modules/sprints/sprints.module';
+import { EpicsModule } from './modules/epics/epics.module';
+import { IssuesModule } from './modules/issues/issues.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -25,6 +28,9 @@ import { HealthController } from './health.controller';
     OrganizationsModule,
     WorkspacesModule,
     ProjectsModule,
+    SprintsModule,
+    EpicsModule,
+    IssuesModule,
   ],
   controllers: [HealthController],
   providers: [

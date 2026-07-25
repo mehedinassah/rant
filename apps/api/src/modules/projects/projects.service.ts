@@ -19,6 +19,18 @@ export class ProjectsService {
     if (!workspace) throw new NotFoundException('Workspace not found');
   }
 
+  /**
+   * Verifies the full org → workspace → project chain and returns the project.
+   * Shared by the sprint/epic/issue modules to keep RBAC + scoping consistent.
+   */
+  async assertInScope(orgId: string, workspaceId: string, projectId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, workspaceId, workspace: { organizationId: orgId } },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    return project;
+  }
+
   async list(orgId: string, workspaceId: string) {
     await this.assertWorkspace(orgId, workspaceId);
     return this.prisma.project.findMany({

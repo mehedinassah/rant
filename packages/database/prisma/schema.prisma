@@ -48,6 +48,43 @@ enum ProjectVisibility {
   PUBLIC
 }
 
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum EpicStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum IssueType {
+  TASK
+  BUG
+  STORY
+  SUBTASK
+}
+
+enum IssueStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum IssuePriority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -67,6 +104,9 @@ model User {
   refreshTokens  RefreshToken[]
   ownedOrgs      Organization[]           @relation("OrgOwner")
   auditLogs      AuditLog[]
+  assignedIssues Issue[]                  @relation("IssueAssignee")
+  reportedIssues Issue[]                  @relation("IssueReporter")
+  comments       Comment[]
 
   @@map("users")
 }
@@ -162,14 +202,109 @@ model Project {
   visibility  ProjectVisibility @default(PRIVATE)
   startDate   DateTime?
   targetDate  DateTime?
+  /// Monotonic counter used to mint human-friendly issue numbers (KEY-123).
+  issueCounter Int              @default(0)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sprints   Sprint[]
+  epics     Epic[]
+  issues    Issue[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
   @@map("projects")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Project management (Linear-style): Sprints · Epics · Issues · Comments
+// ─────────────────────────────────────────────────────────────
+
+model Sprint {
+  id        String       @id @default(cuid())
+  projectId String
+  name      String
+  goal      String?
+  status    SprintStatus @default(PLANNED)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues  Issue[]
+
+  @@index([projectId])
+  @@map("sprints")
+}
+
+model Epic {
+  id          String     @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  status      EpicStatus @default(OPEN)
+  color       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues  Issue[]
+
+  @@index([projectId])
+  @@map("epics")
+}
+
+model Issue {
+  id          String        @id @default(cuid())
+  projectId   String
+  /// Per-project sequential number; rendered as `<project.key>-<number>`.
+  number      Int
+  title       String
+  description String?
+  type        IssueType     @default(TASK)
+  status      IssueStatus   @default(BACKLOG)
+  priority    IssuePriority @default(NONE)
+  storyPoints Int?
+  epicId      String?
+  sprintId    String?
+  parentId    String?
+  assigneeId  String?
+  reporterId  String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  epic     Epic?     @relation(fields: [epicId], references: [id], onDelete: SetNull)
+  sprint   Sprint?   @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  parent   Issue?    @relation("IssueSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  children Issue[]   @relation("IssueSubtasks")
+  assignee User?     @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporter User      @relation("IssueReporter", fields: [reporterId], references: [id])
+  comments Comment[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@index([sprintId])
+  @@index([epicId])
+  @@index([assigneeId])
+  @@map("issues")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  issueId   String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@map("comments")
 }
 
 // ─────────────────────────────────────────────────────────────
