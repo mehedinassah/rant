@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
@@ -107,24 +108,26 @@ export default function DashboardPage() {
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {orgs.map((org) => (
-            <li
-              key={org.id}
-              className="rounded-xl border border-white/10 bg-[var(--color-ink-soft)] p-4"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium">{org.name}</h3>
-                {org.role && (
-                  <span className="rounded-full bg-[var(--color-accent)]/20 px-2 py-0.5 text-xs text-[var(--color-accent-soft)]">
-                    {org.role}
-                  </span>
+            <li key={org.id}>
+              <Link
+                href={`/orgs/${org.id}`}
+                className="block rounded-xl border border-white/10 bg-[var(--color-ink-soft)] p-4 transition hover:border-[var(--color-accent)]/50 hover:bg-white/5"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">{org.name}</h3>
+                  {org.role && (
+                    <span className="rounded-full bg-[var(--color-accent)]/20 px-2 py-0.5 text-xs text-[var(--color-accent-soft)]">
+                      {org.role}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-white/40">/{org.slug}</p>
+                {org._count && (
+                  <p className="mt-3 text-xs text-white/40">
+                    {org._count.memberships} members · {org._count.workspaces} workspaces
+                  </p>
                 )}
-              </div>
-              <p className="mt-1 text-sm text-white/40">/{org.slug}</p>
-              {org._count && (
-                <p className="mt-3 text-xs text-white/40">
-                  {org._count.memberships} members · {org._count.workspaces} workspaces
-                </p>
-              )}
+              </Link>
             </li>
           ))}
         </ul>
