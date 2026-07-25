@@ -1,0 +1,196 @@
+// rant — Prisma schema
+// Milestone 1: Auth · Organizations · Workspaces · Projects (+ RBAC + Audit)
+// The schema is intentionally structured by domain so future modules
+// (repositories, issues, deployments, monitoring, billing, ...) slot in cleanly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+/// Role a user holds within an organization. Drives RBAC everywhere.
+enum OrgRole {
+  OWNER
+  ADMIN
+  MANAGER
+  DEVELOPER
+  QA
+  DEVOPS
+  VIEWER
+  GUEST
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  PAUSED
+  ARCHIVED
+  COMPLETED
+}
+
+enum ProjectVisibility {
+  PRIVATE
+  INTERNAL
+  PUBLIC
+}
+
+// ─────────────────────────────────────────────────────────────
+// Identity & Auth
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  emailVerifiedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships    OrganizationMembership[]
+  refreshTokens  RefreshToken[]
+  ownedOrgs      Organization[]           @relation("OrgOwner")
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+/// Persisted refresh tokens enable rotation + revocation (logout everywhere).
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Organizations & Membership (RBAC boundary)
+// ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner       User                     @relation("OrgOwner", fields: [ownerId], references: [id])
+  memberships OrganizationMembership[]
+  workspaces  Workspace[]
+  auditLogs   AuditLog[]
+
+  @@index([ownerId])
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole          @default(DEVELOPER)
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Workspaces (Notion-like container inside an org)
+// ─────────────────────────────────────────────────────────────
+
+model Workspace {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects     Project[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("workspaces")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Projects (Linear-like)
+// ─────────────────────────────────────────────────────────────
+
+model Project {
+  id          String            @id @default(cuid())
+  workspaceId String
+  name        String
+  key         String // short prefix, e.g. "RANT" -> RANT-123
+  description String?
+  status      ProjectStatus     @default(PLANNING)
+  visibility  ProjectVisibility @default(PRIVATE)
+  startDate   DateTime?
+  targetDate  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("projects")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Audit (immutable event log — every meaningful action lands here)
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  actorId        String?
+  action         String // e.g. "organization.created", "member.role_changed"
+  targetType     String? // e.g. "Project"
+  targetId       String?
+  metadata       Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actor        User?         @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([actorId])
+  @@map("audit_logs")
+}

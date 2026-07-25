@@ -1,0 +1,18 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #0a0a0f;
+  --color-ink-soft: #12121a;
+  --color-accent: #6d5efc;
+  --color-accent-soft: #a99bff;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink);
+  color: #e8e8ef;
+  -webkit-font-smoothing: antialiased;
+}
