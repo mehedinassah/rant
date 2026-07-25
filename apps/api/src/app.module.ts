@@ -17,6 +17,7 @@ import { EpicsModule } from './modules/epics/epics.module';
 import { IssuesModule } from './modules/issues/issues.module';
 import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { CiModule } from './modules/ci/ci.module';
+import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -54,6 +55,7 @@ import { HealthController } from './health.controller';
     IssuesModule,
     RepositoriesModule,
     CiModule,
+    DeploymentsModule,
   ],
   controllers: [HealthController],
   providers: [

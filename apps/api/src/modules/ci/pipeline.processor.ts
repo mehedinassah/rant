@@ -127,6 +127,8 @@ export class PipelineProcessor extends WorkerHost {
       runId,
       pipelineId: run.pipelineId,
       status: status as 'SUCCESS' | 'FAILED',
+      branch: run.branch,
+      commitSha: run.commitSha,
       pullRequestId: run.pullRequestId,
     };
     this.events.emit(AppEvent.PipelineRunCompleted, payload);

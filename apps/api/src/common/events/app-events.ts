@@ -34,5 +34,20 @@ export interface PipelineRunCompletedPayload {
   runId: string;
   pipelineId: string;
   status: 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  branch: string;
+  commitSha?: string | null;
   pullRequestId?: string | null;
+}
+
+export const DeployEvent = {
+  Completed: 'deployment.completed',
+} as const;
+
+export interface DeploymentCompletedPayload {
+  orgId: string;
+  repoId: string;
+  environmentId: string;
+  deploymentId: string;
+  status: 'READY' | 'FAILED' | 'CANCELLED';
+  url?: string | null;
 }

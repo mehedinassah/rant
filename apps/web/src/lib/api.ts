@@ -419,6 +419,136 @@ export function streamRun(
   return () => controller.abort();
 }
 
+// ── deployments ─────────────────────────────────────────────
+
+export type DeploymentStatus =
+  | 'QUEUED'
+  | 'BUILDING'
+  | 'DEPLOYING'
+  | 'READY'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export type EnvironmentType = 'PRODUCTION' | 'PREVIEW' | 'STAGING' | 'DEVELOPMENT';
+
+export interface DeploymentRef {
+  id: string;
+  number: number;
+  status: DeploymentStatus;
+  url?: string | null;
+  branch: string;
+  commitSha?: string | null;
+  createdAt: string;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  slug: string;
+  type: EnvironmentType;
+  isProduction: boolean;
+  branchFilter?: string | null;
+  currentDeployment?: DeploymentRef | null;
+  _count?: { deployments: number };
+}
+
+export interface DeploymentSummary {
+  id: string;
+  number: number;
+  status: DeploymentStatus;
+  branch: string;
+  commitSha?: string | null;
+  url?: string | null;
+  isRollback: boolean;
+  createdAt: string;
+  environment?: { id: string; name: string; slug: string; type: EnvironmentType; isProduction: boolean } | null;
+  triggeredBy?: UserRef | null;
+}
+
+export interface DeploymentDetail extends DeploymentSummary {
+  logs: string;
+  pullRequestId?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
+export const environments = {
+  list: (orgId: string, repoId: string) =>
+    api<Environment[]>(`${repoBase(orgId, repoId)}/environments`),
+  create: (
+    orgId: string,
+    repoId: string,
+    data: { name: string; slug: string; type?: EnvironmentType; branchFilter?: string },
+  ) =>
+    api<Environment>(`${repoBase(orgId, repoId)}/environments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deploy: (orgId: string, repoId: string, envId: string, branch?: string) =>
+    api<DeploymentSummary>(`${repoBase(orgId, repoId)}/environments/${envId}/deploy`, {
+      method: 'POST',
+      body: JSON.stringify(branch ? { branch } : {}),
+    }),
+  rollback: (orgId: string, repoId: string, envId: string, deploymentId: string) =>
+    api<DeploymentSummary>(`${repoBase(orgId, repoId)}/environments/${envId}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify({ deploymentId }),
+    }),
+};
+
+export const deployments = {
+  list: (orgId: string, repoId: string) =>
+    api<DeploymentSummary[]>(`${repoBase(orgId, repoId)}/deployments`),
+  get: (orgId: string, repoId: string, deploymentId: string) =>
+    api<DeploymentDetail>(`${repoBase(orgId, repoId)}/deployments/${deploymentId}`),
+  cancel: (orgId: string, repoId: string, deploymentId: string) =>
+    api<DeploymentDetail>(`${repoBase(orgId, repoId)}/deployments/${deploymentId}/cancel`, {
+      method: 'POST',
+    }),
+};
+
+/** Subscribes to a deployment's live SSE stream (fetch-based, JWT-aware). */
+export function streamDeployment(
+  orgId: string,
+  repoId: string,
+  deploymentId: string,
+  onUpdate: (d: DeploymentDetail) => void,
+): () => void {
+  const controller = new AbortController();
+  const token = getAccessToken();
+  (async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE}${repoBase(orgId, repoId)}/deployments/${deploymentId}/stream`,
+        { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal: controller.signal },
+      );
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          try {
+            onUpdate(JSON.parse(line.slice(5).trim()) as DeploymentDetail);
+          } catch {
+            /* ignore partial frames */
+          }
+        }
+      }
+    } catch {
+      /* aborted or closed — expected */
+    }
+  })();
+  return () => controller.abort();
+}
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
@@ -461,6 +591,25 @@ export const TRIGGER_META: Record<PipelineTrigger, { label: string; icon: string
   PULL_REQUEST: { label: 'Pull request', icon: '⑃' },
   MANUAL: { label: 'Manual', icon: '▸' },
   SCHEDULE: { label: 'Schedule', icon: '◷' },
+};
+
+export const DEPLOY_STATUS_META: Record<
+  DeploymentStatus,
+  { label: string; color: string; dot: string; active: boolean }
+> = {
+  QUEUED: { label: 'Queued', color: '#9ca3af', dot: '○', active: true },
+  BUILDING: { label: 'Building', color: '#f59e0b', dot: '◐', active: true },
+  DEPLOYING: { label: 'Deploying', color: '#3b82f6', dot: '◐', active: true },
+  READY: { label: 'Ready', color: '#22c55e', dot: '●', active: false },
+  FAILED: { label: 'Failed', color: '#ef4444', dot: '✕', active: false },
+  CANCELLED: { label: 'Cancelled', color: '#6b7280', dot: '⊘', active: false },
+};
+
+export const ENV_TYPE_META: Record<EnvironmentType, { label: string; icon: string }> = {
+  PRODUCTION: { label: 'Production', icon: '◆' },
+  PREVIEW: { label: 'Preview', icon: '◇' },
+  STAGING: { label: 'Staging', icon: '▲' },
+  DEVELOPMENT: { label: 'Development', icon: '●' },
 };
 
 export function shortSha(sha?: string | null): string {

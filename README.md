@@ -10,13 +10,15 @@ system.
 > Status: **early foundation.** Auth · Organizations · Workspaces · Projects,
 > a Linear-style project board (Sprints · Epics · Issues · Comments), a
 > GitHub-style repository module (Repos · Branches · Commits · Tags · Releases ·
-> Pull Requests · Reviews · Merge Queue), and a GitHub-Actions-style CI/CD engine
-> (Pipelines · Runs · Jobs · Steps · live logs) — all implemented end-to-end with
-> RBAC + audit logging. CI is where the platform starts to *connect*: a commit
-> or an opened PR automatically triggers pipeline runs on a background worker,
-> and a run's result feeds back into the PR merge gate. The remaining modules
-> from the system design (Deployments, Monitoring, AI Copilot, Billing, …) are
-> on the roadmap.
+> Pull Requests · Reviews · Merge Queue), a GitHub-Actions-style CI/CD engine
+> (Pipelines · Runs · Jobs · Steps · live logs), and Vercel-style Deployments
+> (Environments · deployments · preview URLs · rollback) — all implemented
+> end-to-end with RBAC + audit logging, and with frontends for the board, repos,
+> CI runs and deployments. This is where the platform *connects*: a commit
+> triggers a CI run, a green run gates the PR merge **and** auto-deploys
+> (production on the default branch, a preview URL per pull request) — the whole
+> path from an idea to a live URL inside one system. The remaining modules from
+> the system design (Monitoring, AI Copilot, Billing, …) are on the roadmap.
 
 ---
 
@@ -42,9 +44,11 @@ Every meaningful mutation writes to an immutable `audit_logs` table.
 
 Modules stay decoupled through an internal **event bus** (`@nestjs/event-emitter`):
 one module emits a domain event (`commit.created`, `pull_request.opened`) and
-others react without importing each other. CI/CD listens on that bus and pushes
-work onto a **BullMQ queue** (Redis), where a background worker executes pipeline
-runs step-by-step and streams progress to clients over **Server-Sent Events**.
+others react without importing each other. CI/CD and Deployments both listen on
+that bus and push work onto **BullMQ queues** (Redis), where background workers
+execute pipeline runs and deployments step-by-step and stream progress to
+clients over **Server-Sent Events**. A commit → a CI run → a deployment is one
+chain of events, each hop reacting to the last.
 
 ## Tech stack
 
@@ -155,6 +159,21 @@ opening a PR auto-starts matching runs on a background worker.
 `POST .../runs/:runId/cancel`. A PR's newest run must be green before it can
 merge — a failing or in-flight run blocks the merge with `409`.
 
+**Environments** — `GET|POST .../:repoId/environments` ·
+`PATCH|DELETE .../environments/:envId` ·
+`POST .../environments/:envId/deploy` (manual) ·
+`POST .../environments/:envId/rollback`. A repo is created with a Production
+environment that watches its default branch; each environment tracks the
+`currentDeployment` that is live right now.
+
+**Deployments** — `GET .../:repoId/deployments` ·
+`GET .../deployments/:deploymentId` ·
+`GET .../deployments/:deploymentId/stream` (Server-Sent Events, live logs) ·
+`POST .../deployments/:deploymentId/cancel`. A background worker runs
+BUILDING → DEPLOYING → READY and assigns a public URL. **The ripple:** a green
+CI run auto-deploys — production for a push to the watched branch, a
+PR-scoped preview URL for a pull request.
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -164,6 +183,6 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Documentation · API Platform · Deployments · Monitoring ·
+Documentation · API Platform · Monitoring ·
 Notifications · AI Copilot · Analytics · Billing · Audit UI · Search · Files ·
 Team Chat · Integrations.

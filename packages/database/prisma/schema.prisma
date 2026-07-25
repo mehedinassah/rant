@@ -122,6 +122,24 @@ enum RunStatus {
   SKIPPED
 }
 
+/// Kind of deployment target.
+enum EnvironmentType {
+  PRODUCTION
+  PREVIEW
+  STAGING
+  DEVELOPMENT
+}
+
+/// Lifecycle of a single deployment.
+enum DeploymentStatus {
+  QUEUED
+  BUILDING
+  DEPLOYING
+  READY
+  FAILED
+  CANCELLED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -150,6 +168,7 @@ model User {
   mergedPullRequests  PullRequest[] @relation("PrMergedBy")
   reviews             Review[]      @relation("ReviewAuthor")
   triggeredRuns       PipelineRun[] @relation("RunTriggeredBy")
+  triggeredDeployments Deployment[] @relation("DeployTriggeredBy")
 
   @@map("users")
 }
@@ -380,6 +399,7 @@ model Repository {
   releases     Release[]
   pullRequests PullRequest[]
   pipelines    Pipeline[]
+  environments Environment[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -474,6 +494,7 @@ model PullRequest {
   mergedBy   User?      @relation("PrMergedBy", fields: [mergedById], references: [id], onDelete: SetNull)
   reviews    Review[]
   pipelineRuns PipelineRun[]
+  deployments  Deployment[]
 
   @@unique([repositoryId, number])
   @@index([repositoryId, status])
@@ -583,6 +604,66 @@ model PipelineStep {
 
   @@index([jobId])
   @@map("pipeline_steps")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Deployments (Vercel-style): environments + deployments.
+// This is where the ripple pays off — a successful CI run on the default
+// branch auto-deploys to production, and a green PR gets a preview URL.
+// A background worker builds + releases each deployment (simulated) and the
+// environment's `currentDeployment` points at whatever is live right now.
+// ─────────────────────────────────────────────────────────────
+
+model Environment {
+  id                  String          @id @default(cuid())
+  repositoryId        String
+  name                String
+  slug                String
+  type                EnvironmentType @default(PRODUCTION)
+  /// Branch whose successful runs auto-deploy here (null = no auto-deploy).
+  branchFilter        String?
+  isProduction        Boolean         @default(false)
+  /// The deployment currently serving this environment.
+  currentDeploymentId String?         @unique
+  /// Monotonic counter used to mint per-environment deployment numbers.
+  deployCounter       Int             @default(0)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  repository        Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  currentDeployment Deployment?  @relation("CurrentDeployment", fields: [currentDeploymentId], references: [id], onDelete: SetNull)
+  deployments       Deployment[] @relation("EnvDeployments")
+
+  @@unique([repositoryId, slug])
+  @@index([repositoryId])
+  @@map("environments")
+}
+
+model Deployment {
+  id            String           @id @default(cuid())
+  environmentId String
+  number        Int
+  status        DeploymentStatus @default(QUEUED)
+  branch        String
+  commitSha     String?
+  url           String?
+  logs          String           @default("")
+  pullRequestId String?
+  triggeredById String?
+  isRollback    Boolean          @default(false)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  environment Environment  @relation("EnvDeployments", fields: [environmentId], references: [id], onDelete: Cascade)
+  activeFor   Environment? @relation("CurrentDeployment")
+  pullRequest PullRequest? @relation(fields: [pullRequestId], references: [id], onDelete: SetNull)
+  triggeredBy User?        @relation("DeployTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+
+  @@unique([environmentId, number])
+  @@index([environmentId, status])
+  @@index([pullRequestId])
+  @@map("deployments")
 }
 
 // ─────────────────────────────────────────────────────────────

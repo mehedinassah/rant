@@ -52,7 +52,8 @@ export class RepositoriesService {
 
     const defaultBranch = dto.defaultBranch ?? 'main';
 
-    // Create the repo and its (empty) default branch atomically.
+    // Create the repo, its (empty) default branch, and a Production
+    // environment (which auto-deploys successful runs on the default branch).
     const repo = await this.prisma.repository.create({
       data: {
         organizationId: orgId,
@@ -63,6 +64,15 @@ export class RepositoriesService {
         visibility: dto.visibility,
         defaultBranch,
         branches: { create: { name: defaultBranch, isDefault: true } },
+        environments: {
+          create: {
+            name: 'Production',
+            slug: 'production',
+            type: 'PRODUCTION',
+            isProduction: true,
+            branchFilter: defaultBranch,
+          },
+        },
       },
     });
 

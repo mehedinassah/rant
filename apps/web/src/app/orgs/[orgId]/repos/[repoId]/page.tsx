@@ -115,6 +115,16 @@ export default function RepoPage() {
         </p>
       )}
 
+      <nav className="mt-5 flex gap-2">
+        <span className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium">Pipelines</span>
+        <Link
+          href={`/orgs/${orgId}/repos/${repoId}/deployments`}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
+        >
+          Deployments
+        </Link>
+      </nav>
+
       {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
       {loading && <p className="mt-8 text-white/50">Loading…</p>}
 
