@@ -69,6 +69,16 @@ export default function OrgPage() {
       <h1 className="mt-3 text-2xl font-semibold">{org?.name ?? 'Organization'}</h1>
       <p className="text-sm text-white/40">/{org?.slug}</p>
 
+      <nav className="mt-5 flex gap-2">
+        <span className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium">Projects</span>
+        <Link
+          href={`/orgs/${orgId}/repos`}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
+        >
+          Repositories &amp; CI
+        </Link>
+      </nav>
+
       <form onSubmit={createWorkspace} className="mt-8 flex gap-3">
         <input
           value={wsName}

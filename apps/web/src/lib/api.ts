@@ -257,6 +257,168 @@ export const comments = {
     }),
 };
 
+// ── repositories & CI/CD ────────────────────────────────────
+
+export type RunStatus =
+  | 'QUEUED'
+  | 'RUNNING'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'SKIPPED';
+
+export type PipelineTrigger = 'PUSH' | 'PULL_REQUEST' | 'MANUAL' | 'SCHEDULE';
+
+export interface Repository {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  visibility: string;
+  defaultBranch: string;
+  project?: { id: string; key: string; name: string } | null;
+  _count?: { branches: number; pullRequests: number; commits: number };
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  triggers: PipelineTrigger[];
+  branchFilter?: string | null;
+  isActive: boolean;
+  definition?: { jobs: { name: string; steps: { name: string; run: string }[] }[] };
+  _count?: { runs: number };
+}
+
+export interface RunStep {
+  id: string;
+  name: string;
+  command: string;
+  status: RunStatus;
+  logs: string;
+  orderIdx: number;
+}
+
+export interface RunJob {
+  id: string;
+  name: string;
+  status: RunStatus;
+  orderIdx: number;
+  steps: RunStep[];
+}
+
+export interface RunSummary {
+  id: string;
+  number: number;
+  status: RunStatus;
+  trigger: PipelineTrigger;
+  branch: string;
+  commitSha?: string | null;
+  createdAt: string;
+  pipeline?: { id: string; name: string } | null;
+  triggeredBy?: UserRef | null;
+  _count?: { jobs: number };
+}
+
+export interface RunDetail extends RunSummary {
+  jobs: RunJob[];
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
+const repoBase = (orgId: string, repoId: string) =>
+  `/organizations/${orgId}/repositories/${repoId}`;
+
+export const repositories = {
+  list: (orgId: string) => api<Repository[]>(`/organizations/${orgId}/repositories`),
+  get: (orgId: string, repoId: string) => api<Repository>(repoBase(orgId, repoId)),
+  create: (
+    orgId: string,
+    data: { name: string; slug: string; description?: string; projectId?: string },
+  ) =>
+    api<Repository>(`/organizations/${orgId}/repositories`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+export const pipelines = {
+  list: (orgId: string, repoId: string) =>
+    api<Pipeline[]>(`${repoBase(orgId, repoId)}/pipelines`),
+  get: (orgId: string, repoId: string, pipelineId: string) =>
+    api<Pipeline>(`${repoBase(orgId, repoId)}/pipelines/${pipelineId}`),
+  create: (
+    orgId: string,
+    repoId: string,
+    data: { name: string; triggers?: PipelineTrigger[]; branchFilter?: string },
+  ) =>
+    api<Pipeline>(`${repoBase(orgId, repoId)}/pipelines`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  run: (orgId: string, repoId: string, pipelineId: string, branch?: string) =>
+    api<RunSummary>(`${repoBase(orgId, repoId)}/pipelines/${pipelineId}/run`, {
+      method: 'POST',
+      body: JSON.stringify(branch ? { branch } : {}),
+    }),
+};
+
+export const runs = {
+  list: (orgId: string, repoId: string) => api<RunSummary[]>(`${repoBase(orgId, repoId)}/runs`),
+  get: (orgId: string, repoId: string, runId: string) =>
+    api<RunDetail>(`${repoBase(orgId, repoId)}/runs/${runId}`),
+  cancel: (orgId: string, repoId: string, runId: string) =>
+    api<RunDetail>(`${repoBase(orgId, repoId)}/runs/${runId}/cancel`, { method: 'POST' }),
+};
+
+/**
+ * Subscribes to a run's live Server-Sent Events stream. We use fetch (not the
+ * browser EventSource) because EventSource can't attach the Authorization
+ * header the API's JWT guard requires. Returns an unsubscribe function.
+ */
+export function streamRun(
+  orgId: string,
+  repoId: string,
+  runId: string,
+  onUpdate: (run: RunDetail) => void,
+): () => void {
+  const controller = new AbortController();
+  const token = getAccessToken();
+
+  (async () => {
+    try {
+      const res = await fetch(`${API_BASE}${repoBase(orgId, repoId)}/runs/${runId}/stream`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        signal: controller.signal,
+      });
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          try {
+            onUpdate(JSON.parse(line.slice(5).trim()) as RunDetail);
+          } catch {
+            /* ignore partial frames */
+          }
+        }
+      }
+    } catch {
+      /* aborted or network closed — expected on unmount / run completion */
+    }
+  })();
+
+  return () => controller.abort();
+}
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
@@ -281,6 +443,29 @@ export const TYPE_META: Record<IssueType, { label: string; icon: string; color: 
   BUG: { label: 'Bug', icon: '●', color: '#ef4444' },
   SUBTASK: { label: 'Subtask', icon: '▷', color: '#3b82f6' },
 };
+
+export const RUN_STATUS_META: Record<
+  RunStatus,
+  { label: string; color: string; dot: string }
+> = {
+  QUEUED: { label: 'Queued', color: '#9ca3af', dot: '○' },
+  RUNNING: { label: 'Running', color: '#3b82f6', dot: '◐' },
+  SUCCESS: { label: 'Success', color: '#22c55e', dot: '●' },
+  FAILED: { label: 'Failed', color: '#ef4444', dot: '✕' },
+  CANCELLED: { label: 'Cancelled', color: '#6b7280', dot: '⊘' },
+  SKIPPED: { label: 'Skipped', color: '#6b7280', dot: '–' },
+};
+
+export const TRIGGER_META: Record<PipelineTrigger, { label: string; icon: string }> = {
+  PUSH: { label: 'Push', icon: '↑' },
+  PULL_REQUEST: { label: 'Pull request', icon: '⑃' },
+  MANUAL: { label: 'Manual', icon: '▸' },
+  SCHEDULE: { label: 'Schedule', icon: '◷' },
+};
+
+export function shortSha(sha?: string | null): string {
+  return sha ? sha.slice(0, 7) : '—';
+}
 
 export function initials(name: string): string {
   return name
