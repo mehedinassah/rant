@@ -14,18 +14,19 @@ system.
 > (Pipelines · Runs · Jobs · Steps · live logs), Vercel-style Deployments
 > (Environments · deployments · preview URLs · rollback), Datadog-style
 > Monitoring (Monitors · time-series metrics · live charts · auto-incidents),
-> and a cross-cutting Notification center (per-user feed · live bell · delivery
-> preferences) — all implemented end-to-end with RBAC + audit logging, and with
-> frontends for the board, repos, CI runs, deployments, monitoring and
-> notifications. This is where the platform *connects*: a commit triggers a CI
+> a cross-cutting Notification center (per-user feed · live bell · delivery
+> preferences), and a Notion-style Documentation base (nested pages · Markdown ·
+> full version history) — all implemented end-to-end with RBAC + audit logging,
+> and with frontends for the board, repos, CI runs, deployments, monitoring,
+> notifications and docs. This is where the platform *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
-> continuously health-checked, a sustained outage **auto-opens an incident and
-> files a bug on the linked project**, and every one of those events **fans out
-> as a notification** to the right people — the whole loop from an idea to a
-> live URL to an observed outage to a human being told, inside one system. The
-> remaining modules from the system design (AI Copilot, Billing, …) are on the
-> roadmap.
+> continuously health-checked, a sustained outage **auto-opens an incident,
+> files a bug on the linked project, drafts a postmortem page** in that
+> workspace's docs, and **fans out as a notification** to the right people — the
+> whole loop from an idea to a live URL to an observed outage to a human being
+> told, inside one system. The remaining modules from the system design (AI
+> Copilot, Billing, …) are on the roadmap.
 
 ---
 
@@ -213,6 +214,14 @@ incident and a new pull request each fan out to the relevant members' feed
 (by org role), respecting per-category in-app/email preferences. Email is a
 logged stub until a real provider is wired up.
 
+**Documentation** — `GET|POST .../workspaces/:workspaceId/docs` (page tree) ·
+`GET|PATCH|DELETE .../docs/:docId` · `GET .../docs/:docId/revisions` ·
+`GET .../docs/:docId/revisions/:revisionId` ·
+`POST .../docs/:docId/revisions/:revisionId/restore`. A workspace knowledge base
+of nested Markdown pages; every edit snapshots an immutable revision (restore is
+itself reversible). Also a bus consumer — a CRITICAL incident auto-drafts a
+templated postmortem page in the affected repo's workspace.
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -222,5 +231,5 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Documentation · API Platform · AI Copilot · Analytics ·
-Billing · Audit UI · Search · Files · Team Chat · Integrations.
+API Platform · AI Copilot · Analytics · Billing · Audit UI · Search · Files ·
+Team Chat · Integrations.

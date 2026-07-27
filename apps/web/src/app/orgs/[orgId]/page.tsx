@@ -141,9 +141,17 @@ function WorkspaceSection({
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/50">
-        {ws.name}
-      </h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-white/50">
+          {ws.name}
+        </h2>
+        <Link
+          href={`/orgs/${orgId}/workspaces/${ws.id}/docs`}
+          className="text-xs font-medium text-white/50 hover:text-white"
+        >
+          📖 Docs →
+        </Link>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {ws.projects.map((p) => (
           <Link

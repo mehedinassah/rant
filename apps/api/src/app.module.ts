@@ -20,6 +20,7 @@ import { CiModule } from './modules/ci/ci.module';
 import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DocsModule } from './modules/docs/docs.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -60,6 +61,7 @@ import { HealthController } from './health.controller';
     DeploymentsModule,
     MonitoringModule,
     NotificationsModule,
+    DocsModule,
   ],
   controllers: [HealthController],
   providers: [

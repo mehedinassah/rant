@@ -225,6 +225,9 @@ model User {
   triggeredDeployments Deployment[] @relation("DeployTriggeredBy")
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  authoredDocs            Doc[]         @relation("DocAuthor")
+  editedDocs              Doc[]         @relation("DocEditor")
+  docRevisions            DocRevision[] @relation("RevisionEditor")
 
   @@map("users")
 }
@@ -301,6 +304,7 @@ model Workspace {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   projects     Project[]
+  docs         Doc[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -843,6 +847,56 @@ model NotificationPreference {
 
   @@unique([userId, category])
   @@map("notification_preferences")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Documentation (Notion/Confluence-style): a workspace knowledge base of
+// nested pages with full version history. Every save snapshots an immutable
+// revision (same philosophy as the audit log). It's also a bus consumer: a
+// CRITICAL incident auto-drafts a postmortem page in the relevant workspace.
+// ─────────────────────────────────────────────────────────────
+
+model Doc {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  parentId       String?
+  title          String
+  /// Markdown body.
+  content        String   @default("")
+  icon           String?
+  /// Sort order among siblings.
+  position       Int      @default(0)
+  isArchived     Boolean  @default(false)
+  authorId       String
+  lastEditedById String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent       Doc?          @relation("DocTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Doc[]         @relation("DocTree")
+  author       User          @relation("DocAuthor", fields: [authorId], references: [id])
+  lastEditedBy User?         @relation("DocEditor", fields: [lastEditedById], references: [id], onDelete: SetNull)
+  revisions    DocRevision[]
+
+  @@index([workspaceId])
+  @@index([parentId])
+  @@map("docs")
+}
+
+model DocRevision {
+  id         String   @id @default(cuid())
+  docId      String
+  title      String
+  content    String
+  editedById String?
+  createdAt  DateTime @default(now())
+
+  doc      Doc   @relation(fields: [docId], references: [id], onDelete: Cascade)
+  editedBy User? @relation("RevisionEditor", fields: [editedById], references: [id], onDelete: SetNull)
+
+  @@index([docId, createdAt])
+  @@map("doc_revisions")
 }
 
 // ─────────────────────────────────────────────────────────────

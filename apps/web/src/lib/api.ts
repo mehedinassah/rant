@@ -799,6 +799,82 @@ export function streamNotifications(onUpdate: (snap: NotificationSnapshot) => vo
   return () => controller.abort();
 }
 
+// ── documentation ───────────────────────────────────────────
+
+export interface DocSummary {
+  id: string;
+  title: string;
+  icon?: string | null;
+  parentId?: string | null;
+  position: number;
+  updatedAt: string;
+}
+
+export interface DocDetail {
+  id: string;
+  workspaceId: string;
+  parentId?: string | null;
+  title: string;
+  content: string;
+  icon?: string | null;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+  author: UserRef;
+  lastEditedBy?: UserRef | null;
+  _count?: { revisions: number; children: number };
+}
+
+export interface DocRevisionSummary {
+  id: string;
+  title: string;
+  editedBy?: UserRef | null;
+  createdAt: string;
+}
+
+export interface DocRevisionDetail extends DocRevisionSummary {
+  content: string;
+}
+
+const docsBase = (orgId: string, workspaceId: string) =>
+  `/organizations/${orgId}/workspaces/${workspaceId}/docs`;
+
+export const docs = {
+  list: (orgId: string, workspaceId: string) =>
+    api<DocSummary[]>(docsBase(orgId, workspaceId)),
+  get: (orgId: string, workspaceId: string, docId: string) =>
+    api<DocDetail>(`${docsBase(orgId, workspaceId)}/${docId}`),
+  create: (
+    orgId: string,
+    workspaceId: string,
+    data: { title: string; content?: string; icon?: string; parentId?: string | null },
+  ) =>
+    api<DocDetail>(docsBase(orgId, workspaceId), {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (
+    orgId: string,
+    workspaceId: string,
+    docId: string,
+    data: Partial<{ title: string; content: string; icon: string; parentId: string | null; position: number }>,
+  ) =>
+    api<DocDetail>(`${docsBase(orgId, workspaceId)}/${docId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  remove: (orgId: string, workspaceId: string, docId: string) =>
+    api<{ success: boolean }>(`${docsBase(orgId, workspaceId)}/${docId}`, { method: 'DELETE' }),
+  revisions: (orgId: string, workspaceId: string, docId: string) =>
+    api<DocRevisionSummary[]>(`${docsBase(orgId, workspaceId)}/${docId}/revisions`),
+  revision: (orgId: string, workspaceId: string, docId: string, revisionId: string) =>
+    api<DocRevisionDetail>(`${docsBase(orgId, workspaceId)}/${docId}/revisions/${revisionId}`),
+  restore: (orgId: string, workspaceId: string, docId: string, revisionId: string) =>
+    api<DocDetail>(`${docsBase(orgId, workspaceId)}/${docId}/revisions/${revisionId}/restore`, {
+      method: 'POST',
+    }),
+};
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
