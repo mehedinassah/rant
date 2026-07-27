@@ -21,6 +21,7 @@ import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DocsModule } from './modules/docs/docs.module';
+import { SearchModule } from './modules/search/search.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -62,6 +63,7 @@ import { HealthController } from './health.controller';
     MonitoringModule,
     NotificationsModule,
     DocsModule,
+    SearchModule,
   ],
   controllers: [HealthController],
   providers: [

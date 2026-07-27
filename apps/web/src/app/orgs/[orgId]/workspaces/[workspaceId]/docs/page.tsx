@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   docs as docsApi,
   type DocDetail,
@@ -35,9 +35,11 @@ function timeAgo(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-export default function DocsPage() {
+function DocsInner() {
   const ready = useRequireAuth();
   const { orgId, workspaceId } = useParams<{ orgId: string; workspaceId: string }>();
+  const searchParams = useSearchParams();
+  const docParam = searchParams.get('doc');
   const [flat, setFlat] = useState<DocSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [doc, setDoc] = useState<DocDetail | null>(null);
@@ -76,6 +78,12 @@ export default function DocsPage() {
     },
     [orgId, workspaceId],
   );
+
+  // Deep-link support: /docs?doc=<id> opens that page (e.g. from search).
+  useEffect(() => {
+    if (ready && docParam && docParam !== selectedId) void selectDoc(docParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, docParam]);
 
   async function createPage(parentId?: string | null) {
     setBusy(true);
@@ -315,6 +323,14 @@ export default function DocsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function DocsPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-6xl px-6 py-10 text-white/50">Loading…</main>}>
+      <DocsInner />
+    </Suspense>
   );
 }
 

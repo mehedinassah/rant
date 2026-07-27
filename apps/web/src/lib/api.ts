@@ -875,6 +875,69 @@ export const docs = {
     }),
 };
 
+// ── search ──────────────────────────────────────────────────
+
+export type SearchType =
+  | 'issue'
+  | 'project'
+  | 'repository'
+  | 'pull_request'
+  | 'doc'
+  | 'incident';
+
+export interface SearchResult {
+  type: SearchType;
+  id: string;
+  title: string;
+  subtitle?: string;
+  snippet?: string;
+  linkPath: string;
+}
+
+export interface SearchGroup {
+  type: SearchType;
+  label: string;
+  results: SearchResult[];
+}
+
+export interface SearchResponse {
+  query: string;
+  total: number;
+  groups: SearchGroup[];
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  createdAt: string;
+}
+
+export const search = {
+  run: (orgId: string, q: string, types?: SearchType[]) => {
+    const params = new URLSearchParams({ q });
+    if (types && types.length) params.set('types', types.join(','));
+    return api<SearchResponse>(`/organizations/${orgId}/search?${params.toString()}`);
+  },
+  listSaved: (orgId: string) => api<SavedSearch[]>(`/organizations/${orgId}/search/saved`),
+  createSaved: (orgId: string, data: { name: string; query: string }) =>
+    api<SavedSearch>(`/organizations/${orgId}/search/saved`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  removeSaved: (orgId: string, id: string) =>
+    api<{ success: boolean }>(`/organizations/${orgId}/search/saved/${id}`, { method: 'DELETE' }),
+};
+
+export const SEARCH_TYPE_META: Record<SearchType, { label: string; icon: string; color: string }> = {
+  issue: { label: 'Issue', icon: '✔', color: '#6d5efc' },
+  project: { label: 'Project', icon: '◈', color: '#22c55e' },
+  repository: { label: 'Repo', icon: '⎇', color: '#3b82f6' },
+  pull_request: { label: 'PR', icon: '⑃', color: '#a99bff' },
+  doc: { label: 'Doc', icon: '📄', color: '#eab308' },
+  incident: { label: 'Incident', icon: '◉', color: '#ef4444' },
+};
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [

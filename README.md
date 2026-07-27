@@ -15,10 +15,12 @@ system.
 > (Environments · deployments · preview URLs · rollback), Datadog-style
 > Monitoring (Monitors · time-series metrics · live charts · auto-incidents),
 > a cross-cutting Notification center (per-user feed · live bell · delivery
-> preferences), and a Notion-style Documentation base (nested pages · Markdown ·
-> full version history) — all implemented end-to-end with RBAC + audit logging,
-> and with frontends for the board, repos, CI runs, deployments, monitoring,
-> notifications and docs. This is where the platform *connects*: a commit triggers a CI
+> preferences), a Notion-style Documentation base (nested pages · Markdown ·
+> full version history), and unified Search (one box across issues, projects,
+> repos, PRs, docs and incidents) — all implemented end-to-end with RBAC +
+> audit logging, and with frontends for the board, repos, CI runs, deployments,
+> monitoring, notifications, docs and search. This is where the platform
+> *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
 > continuously health-checked, a sustained outage **auto-opens an incident,
@@ -222,6 +224,13 @@ of nested Markdown pages; every edit snapshots an immutable revision (restore is
 itself reversible). Also a bus consumer — a CRITICAL incident auto-drafts a
 templated postmortem page in the affected repo's workspace.
 
+**Search** — `GET .../search?q=&types=&limit=` (unified, org-scoped search across
+issues, projects, repositories, pull requests, docs and incidents; results
+grouped by type with matched-text snippets and a frontend deep-link each) ·
+`GET|POST .../search/saved` · `DELETE .../search/saved/:id` (per-user pinned
+queries). The payoff of one connected system — a single box finds anything, and
+every result jumps straight to the module that owns it.
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -231,5 +240,5 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-API Platform · AI Copilot · Analytics · Billing · Audit UI · Search · Files ·
+API Platform · AI Copilot · Analytics · Billing · Audit UI · Files ·
 Team Chat · Integrations.

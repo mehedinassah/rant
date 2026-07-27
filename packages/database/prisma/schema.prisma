@@ -228,6 +228,7 @@ model User {
   authoredDocs            Doc[]         @relation("DocAuthor")
   editedDocs              Doc[]         @relation("DocEditor")
   docRevisions            DocRevision[] @relation("RevisionEditor")
+  savedSearches           SavedSearch[]
 
   @@map("users")
 }
@@ -262,11 +263,12 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner        User                     @relation("OrgOwner", fields: [ownerId], references: [id])
-  memberships  OrganizationMembership[]
-  workspaces   Workspace[]
-  repositories Repository[]
-  auditLogs    AuditLog[]
+  owner         User                     @relation("OrgOwner", fields: [ownerId], references: [id])
+  memberships   OrganizationMembership[]
+  workspaces    Workspace[]
+  repositories  Repository[]
+  auditLogs     AuditLog[]
+  savedSearches SavedSearch[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -897,6 +899,27 @@ model DocRevision {
 
   @@index([docId, createdAt])
   @@map("doc_revisions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Search — a unified query across every module (issues, repos, PRs, docs,
+// incidents, …). The search itself needs no storage; this model just lets a
+// user pin frequently-run queries per organization.
+// ─────────────────────────────────────────────────────────────
+
+model SavedSearch {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  name           String
+  query          String
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, organizationId])
+  @@map("saved_searches")
 }
 
 // ─────────────────────────────────────────────────────────────

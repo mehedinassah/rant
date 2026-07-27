@@ -68,7 +68,15 @@ export default function OrgPage() {
         <Link href="/dashboard" className="text-sm text-white/50 hover:text-white">
           ← All organizations
         </Link>
-        <NotificationBell />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/orgs/${orgId}/search`}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+          >
+            🔍 Search
+          </Link>
+          <NotificationBell />
+        </div>
       </div>
       <h1 className="mt-3 text-2xl font-semibold">{org?.name ?? 'Organization'}</h1>
       <p className="text-sm text-white/40">/{org?.slug}</p>
