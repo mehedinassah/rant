@@ -17,10 +17,12 @@ system.
 > a cross-cutting Notification center (per-user feed · live bell · delivery
 > preferences), a Notion-style Documentation base (nested pages · Markdown ·
 > full version history), unified Search (one box across issues, projects,
-> repos, PRs, docs and incidents), and an API Platform (programmatic API keys ·
-> OpenAPI docs · outbound webhooks) — all implemented end-to-end with RBAC +
-> audit logging, and with frontends for the board, repos, CI runs, deployments,
-> monitoring, notifications, docs, search and API settings. This is where the
+> repos, PRs, docs and incidents), an API Platform (programmatic API keys ·
+> OpenAPI docs · outbound webhooks), and an Analytics dashboard (deploy
+> frequency · CI pass rate · MTTR · issue throughput across every module) — all
+> implemented end-to-end with RBAC + audit logging, and with frontends for the
+> board, repos, CI runs, deployments, monitoring, notifications, docs, search,
+> API settings and analytics. This is where the
 > platform *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
@@ -236,6 +238,12 @@ grouped by type with matched-text snippets and a frontend deep-link each) ·
 queries). The payoff of one connected system — a single box finds anything, and
 every result jumps straight to the module that owns it.
 
+**Analytics** — `GET .../analytics/overview?days=` (org-wide rollup computed live
+across every module: totals, issue throughput + status mix, deployment frequency
++ success rate, CI pass rate, incident count + MTTR, monitor uptime, and the
+most-deployed repos). No new storage — it aggregates the data the other modules
+already produce.
+
 **API Platform** — `GET|POST .../api-keys` · `DELETE .../api-keys/:keyId`
 (programmatic keys; the raw secret is shown once, stored only as a SHA-256 hash).
 A key authenticates via `X-API-Key:` or `Authorization: Bearer rant_…` and acts
@@ -254,4 +262,4 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-AI Copilot · Analytics · Billing · Audit UI · Files · Team Chat · Integrations.
+AI Copilot · Billing · Audit UI · Files · Team Chat · Integrations.

@@ -1013,6 +1013,48 @@ export const apiPlatform = {
     api<WebhookDelivery[]>(`${orgBase(orgId)}/webhooks/${webhookId}/deliveries`),
 };
 
+// ── analytics ───────────────────────────────────────────────
+
+export interface DayPoint {
+  date: string;
+  count: number;
+}
+
+export interface AnalyticsOverview {
+  range: { days: number; from: string };
+  totals: {
+    projects: number;
+    repositories: number;
+    members: number;
+    openIssues: number;
+    deployments: number;
+    openIncidents: number;
+  };
+  issues: {
+    byStatus: Record<string, number>;
+    createdSeries: DayPoint[];
+    completedSeries: DayPoint[];
+  };
+  deployments: {
+    series: DayPoint[];
+    total: number;
+    ready: number;
+    failed: number;
+    successRate: number;
+  };
+  ci: { total: number; success: number; failed: number; passRate: number };
+  incidents: { total: number; open: number; mttrMinutes: number | null };
+  monitors: { total: number; up: number };
+  topRepos: { id: string; name: string; deployments: number }[];
+}
+
+export const analytics = {
+  overview: (orgId: string, days?: number) =>
+    api<AnalyticsOverview>(
+      `/organizations/${orgId}/analytics/overview${days ? `?days=${days}` : ''}`,
+    ),
+};
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
