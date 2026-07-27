@@ -24,6 +24,7 @@ import { DocsModule } from './modules/docs/docs.module';
 import { SearchModule } from './modules/search/search.module';
 import { ApiPlatformModule } from './modules/api-platform/api-platform.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -68,6 +69,7 @@ import { HealthController } from './health.controller';
     SearchModule,
     ApiPlatformModule,
     AnalyticsModule,
+    BillingModule,
   ],
   controllers: [HealthController],
   providers: [

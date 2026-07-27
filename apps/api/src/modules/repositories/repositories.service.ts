@@ -7,6 +7,7 @@ import {
 import type { Repository } from '@rant/database';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { BillingService } from '../billing/billing.service';
 import { CreateRepositoryDto, UpdateRepositoryDto } from './dto/repository.dto';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class RepositoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly billing: BillingService,
   ) {}
 
   /** Loads a repo and confirms it belongs to the org (404 otherwise). */
@@ -37,6 +39,8 @@ export class RepositoriesService {
   }
 
   async create(orgId: string, actorId: string, dto: CreateRepositoryDto) {
+    await this.billing.assertWithinLimit(orgId, 'repositories');
+
     const clash = await this.prisma.repository.findUnique({
       where: { organizationId_slug: { organizationId: orgId, slug: dto.slug } },
     });

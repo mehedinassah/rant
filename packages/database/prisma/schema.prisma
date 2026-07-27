@@ -200,6 +200,28 @@ enum WebhookDeliveryStatus {
   FAILED
 }
 
+/// Subscription plan an organization is on.
+enum PlanTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+/// Lifecycle of an organization's subscription.
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+/// State of a generated invoice.
+enum InvoiceStatus {
+  PAID
+  OPEN
+  VOID
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -278,6 +300,8 @@ model Organization {
   savedSearches    SavedSearch[]
   apiKeys          ApiKey[]
   webhookEndpoints WebhookEndpoint[]
+  subscription     Subscription?
+  invoices         Invoice[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -993,6 +1017,47 @@ model WebhookDelivery {
 
   @@index([endpointId, createdAt])
   @@map("webhook_deliveries")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Billing — each org has one subscription (defaulting to FREE) whose plan
+// gates how many members/repos/projects it may create; changing plans mints a
+// simulated invoice. No real payment processor — the money is make-believe, the
+// enforcement is real.
+// ─────────────────────────────────────────────────────────────
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  organizationId     String             @unique
+  plan               PlanTier           @default(FREE)
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  organizationId String
+  plan           PlanTier
+  amountCents    Int
+  currency       String        @default("usd")
+  status         InvoiceStatus @default(PAID)
+  periodStart    DateTime
+  periodEnd      DateTime
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("invoices")
 }
 
 // ─────────────────────────────────────────────────────────────

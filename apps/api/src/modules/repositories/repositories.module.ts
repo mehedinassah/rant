@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BillingModule } from '../billing/billing.module';
 import { RepositoriesController } from './repositories.controller';
 import { RepositoriesService } from './repositories.service';
 import { BranchesController } from './branches.controller';
@@ -14,6 +15,7 @@ import { PullRequestsService } from './pull-requests.service';
 import { MergeQueueController } from './merge-queue.controller';
 
 @Module({
+  imports: [BillingModule],
   controllers: [
     RepositoriesController,
     BranchesController,

@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { BillingService } from '../billing/billing.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly billing: BillingService,
   ) {}
 
   /** Confirms the workspace belongs to the org before any project operation. */
@@ -41,6 +43,7 @@ export class ProjectsService {
 
   async create(orgId: string, workspaceId: string, actorId: string, dto: CreateProjectDto) {
     await this.assertWorkspace(orgId, workspaceId);
+    await this.billing.assertWithinLimit(orgId, 'projects');
 
     const clash = await this.prisma.project.findUnique({
       where: { workspaceId_key: { workspaceId, key: dto.key } },

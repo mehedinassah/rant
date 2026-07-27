@@ -1055,6 +1055,73 @@ export const analytics = {
     ),
 };
 
+// ── billing ─────────────────────────────────────────────────
+
+export type PlanTier = 'FREE' | 'PRO' | 'ENTERPRISE';
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
+export type InvoiceStatus = 'PAID' | 'OPEN' | 'VOID';
+
+export interface PlanDefinition {
+  tier: PlanTier;
+  label: string;
+  priceCents: number;
+  limits: { members: number | null; repositories: number | null; projects: number | null };
+  features: string[];
+}
+
+export interface Subscription {
+  id: string;
+  plan: PlanTier;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface UsageMetric {
+  used: number;
+  limit: number | null;
+}
+
+export interface UsageResponse {
+  plan: PlanTier;
+  usage: { members: UsageMetric; repositories: UsageMetric; projects: UsageMetric };
+}
+
+export interface Invoice {
+  id: string;
+  plan: PlanTier;
+  amountCents: number;
+  currency: string;
+  status: InvoiceStatus;
+  periodStart: string;
+  periodEnd: string;
+  paidAt?: string | null;
+  createdAt: string;
+}
+
+const billingBase = (orgId: string) => `/organizations/${orgId}/billing`;
+
+export const billing = {
+  plans: (orgId: string) => api<PlanDefinition[]>(`${billingBase(orgId)}/plans`),
+  subscription: (orgId: string) => api<Subscription>(`${billingBase(orgId)}/subscription`),
+  usage: (orgId: string) => api<UsageResponse>(`${billingBase(orgId)}/usage`),
+  invoices: (orgId: string) => api<Invoice[]>(`${billingBase(orgId)}/invoices`),
+  changePlan: (orgId: string, plan: PlanTier) =>
+    api<Subscription>(`${billingBase(orgId)}/subscription`, {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
+    }),
+  cancel: (orgId: string) =>
+    api<Subscription>(`${billingBase(orgId)}/subscription/cancel`, { method: 'POST' }),
+  resume: (orgId: string) =>
+    api<Subscription>(`${billingBase(orgId)}/subscription/resume`, { method: 'POST' }),
+};
+
+export function formatPrice(cents: number): string {
+  return cents === 0 ? 'Free' : `$${(cents / 100).toFixed(0)}/mo`;
+}
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [

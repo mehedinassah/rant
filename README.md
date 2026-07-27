@@ -18,11 +18,12 @@ system.
 > preferences), a Notion-style Documentation base (nested pages · Markdown ·
 > full version history), unified Search (one box across issues, projects,
 > repos, PRs, docs and incidents), an API Platform (programmatic API keys ·
-> OpenAPI docs · outbound webhooks), and an Analytics dashboard (deploy
-> frequency · CI pass rate · MTTR · issue throughput across every module) — all
+> OpenAPI docs · outbound webhooks), an Analytics dashboard (deploy
+> frequency · CI pass rate · MTTR · issue throughput across every module), and
+> Billing (plans · subscriptions · invoices · plan-gated limits) — all
 > implemented end-to-end with RBAC + audit logging, and with frontends for the
 > board, repos, CI runs, deployments, monitoring, notifications, docs, search,
-> API settings and analytics. This is where the
+> API settings, analytics and billing. This is where the
 > platform *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
@@ -244,6 +245,16 @@ across every module: totals, issue throughput + status mix, deployment frequency
 most-deployed repos). No new storage — it aggregates the data the other modules
 already produce.
 
+**Billing** — `GET .../billing/plans` · `GET .../billing/subscription` ·
+`GET .../billing/usage` · `GET .../billing/invoices` ·
+`POST .../billing/subscription` (change plan) ·
+`POST .../billing/subscription/cancel|resume`. Every org has a subscription
+(FREE by default) whose plan **gates how many members / repositories / projects
+it can create** — exceeding the limit returns a `403` with an upgrade prompt,
+enforced right in those create paths. Changing to a paid plan mints a simulated
+invoice. No real payment processor; the money is make-believe, the enforcement
+is real.
+
 **API Platform** — `GET|POST .../api-keys` · `DELETE .../api-keys/:keyId`
 (programmatic keys; the raw secret is shown once, stored only as a SHA-256 hash).
 A key authenticates via `X-API-Key:` or `Authorization: Bearer rant_…` and acts
@@ -262,4 +273,4 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-AI Copilot · Billing · Audit UI · Files · Team Chat · Integrations.
+AI Copilot · Audit UI · Files · Team Chat · Integrations.

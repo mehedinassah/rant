@@ -8,6 +8,7 @@ import {
 import { MembershipStatus, OrgRole } from '@rant/database';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { BillingService } from '../billing/billing.service';
 import {
   CreateOrganizationDto,
   InviteMemberDto,
@@ -20,6 +21,7 @@ export class OrganizationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly billing: BillingService,
   ) {}
 
   /** Organizations the user is an active member of. */
@@ -126,6 +128,8 @@ export class OrganizationsService {
       where: { organizationId_userId: { organizationId: orgId, userId: user.id } },
     });
     if (existing) throw new ConflictException('User is already a member');
+
+    await this.billing.assertWithinLimit(orgId, 'members');
 
     const membership = await this.prisma.organizationMembership.create({
       data: {
