@@ -22,6 +22,7 @@ import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DocsModule } from './modules/docs/docs.module';
 import { SearchModule } from './modules/search/search.module';
+import { ApiPlatformModule } from './modules/api-platform/api-platform.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -64,6 +65,7 @@ import { HealthController } from './health.controller';
     NotificationsModule,
     DocsModule,
     SearchModule,
+    ApiPlatformModule,
   ],
   controllers: [HealthController],
   providers: [

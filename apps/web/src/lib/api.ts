@@ -938,6 +938,81 @@ export const SEARCH_TYPE_META: Record<SearchType, { label: string; icon: string;
   incident: { label: 'Incident', icon: '◉', color: '#ef4444' },
 };
 
+// ── API platform (keys + webhooks) ──────────────────────────
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  lastUsedAt?: string | null;
+  expiresAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+  user?: { id: string; name: string } | null;
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  key: string;
+}
+
+export interface Webhook {
+  id: string;
+  url: string;
+  secret: string;
+  events: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type WebhookDeliveryStatus = 'SUCCESS' | 'FAILED';
+
+export interface WebhookDelivery {
+  id: string;
+  event: string;
+  status: WebhookDeliveryStatus;
+  statusCode?: number | null;
+  error?: string | null;
+  createdAt: string;
+}
+
+const orgBase = (orgId: string) => `/organizations/${orgId}`;
+
+/** Origin of the API, for linking to the OpenAPI docs UI. */
+export const API_ORIGIN =
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+export const apiPlatform = {
+  listKeys: (orgId: string) => api<ApiKey[]>(`${orgBase(orgId)}/api-keys`),
+  createKey: (orgId: string, data: { name: string; expiresInDays?: number }) =>
+    api<ApiKeyCreated>(`${orgBase(orgId)}/api-keys`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  revokeKey: (orgId: string, keyId: string) =>
+    api<{ success: boolean }>(`${orgBase(orgId)}/api-keys/${keyId}`, { method: 'DELETE' }),
+
+  webhookEvents: (orgId: string) => api<string[]>(`${orgBase(orgId)}/webhook-events`),
+  listWebhooks: (orgId: string) => api<Webhook[]>(`${orgBase(orgId)}/webhooks`),
+  createWebhook: (orgId: string, data: { url: string; events?: string[] }) =>
+    api<Webhook>(`${orgBase(orgId)}/webhooks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateWebhook: (
+    orgId: string,
+    webhookId: string,
+    data: Partial<{ url: string; events: string[]; isActive: boolean }>,
+  ) =>
+    api<Webhook>(`${orgBase(orgId)}/webhooks/${webhookId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  removeWebhook: (orgId: string, webhookId: string) =>
+    api<{ success: boolean }>(`${orgBase(orgId)}/webhooks/${webhookId}`, { method: 'DELETE' }),
+  deliveries: (orgId: string, webhookId: string) =>
+    api<WebhookDelivery[]>(`${orgBase(orgId)}/webhooks/${webhookId}/deliveries`),
+};
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [

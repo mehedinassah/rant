@@ -16,11 +16,12 @@ system.
 > Monitoring (Monitors · time-series metrics · live charts · auto-incidents),
 > a cross-cutting Notification center (per-user feed · live bell · delivery
 > preferences), a Notion-style Documentation base (nested pages · Markdown ·
-> full version history), and unified Search (one box across issues, projects,
-> repos, PRs, docs and incidents) — all implemented end-to-end with RBAC +
+> full version history), unified Search (one box across issues, projects,
+> repos, PRs, docs and incidents), and an API Platform (programmatic API keys ·
+> OpenAPI docs · outbound webhooks) — all implemented end-to-end with RBAC +
 > audit logging, and with frontends for the board, repos, CI runs, deployments,
-> monitoring, notifications, docs and search. This is where the platform
-> *connects*: a commit triggers a CI
+> monitoring, notifications, docs, search and API settings. This is where the
+> platform *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
 > continuously health-checked, a sustained outage **auto-opens an incident,
@@ -63,15 +64,18 @@ deployment, records time-series health, and opens/resolves incidents — a
 critical incident even ripples *back* into project management by filing a bug
 issue. **Notifications** is the pure consumer at the end of the bus: it
 subscribes to CI, deploy, incident and pull-request events and fans each one out
-to the right people's feed (respecting per-category delivery preferences). A
-commit → a CI run → a deployment → a monitored URL → an incident → a bug → a
-notification is one chain of events, each hop reacting to the last.
+to the right people's feed (respecting per-category delivery preferences). The
+**API Platform** then re-broadcasts those same events as HMAC-signed outbound
+webhooks, so the ripple reaches external systems too. A commit → a CI run → a
+deployment → a monitored URL → an incident → a bug → a notification → a webhook
+is one chain of events, each hop reacting to the last.
 
 ## Tech stack
 
 Next.js 15 · NestJS 10 · Prisma 6 · PostgreSQL · Redis · BullMQ (queue + worker) ·
-Server-Sent Events · in-process scheduler · Turborepo · pnpm · TypeScript ·
-argon2 · JWT (access + rotating refresh tokens).
+Server-Sent Events · in-process scheduler · OpenAPI/Swagger · Turborepo · pnpm ·
+TypeScript · argon2 · JWT (access + rotating refresh tokens) · API keys +
+HMAC-signed webhooks.
 
 ## Prerequisites
 
@@ -99,6 +103,7 @@ pnpm dev
 ```
 
 - API → http://localhost:4000/api/v1 (health: `/api/v1/health`)
+- API docs (OpenAPI/Swagger) → http://localhost:4000/docs
 - Web → http://localhost:3000
 
 ## Useful scripts
@@ -231,6 +236,15 @@ grouped by type with matched-text snippets and a frontend deep-link each) ·
 queries). The payoff of one connected system — a single box finds anything, and
 every result jumps straight to the module that owns it.
 
+**API Platform** — `GET|POST .../api-keys` · `DELETE .../api-keys/:keyId`
+(programmatic keys; the raw secret is shown once, stored only as a SHA-256 hash).
+A key authenticates via `X-API-Key:` or `Authorization: Bearer rant_…` and acts
+as its creating user, so all RBAC applies. `GET|POST .../webhooks` ·
+`PATCH|DELETE .../webhooks/:id` · `GET .../webhooks/:id/deliveries` ·
+`GET .../webhook-events` — subscribe an endpoint to bus events and receive
+HMAC-signed (`X-Rant-Signature`) POSTs, with every attempt logged. Interactive
+**OpenAPI docs** are served at `/docs`.
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -240,5 +254,4 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-API Platform · AI Copilot · Analytics · Billing · Audit UI · Files ·
-Team Chat · Integrations.
+AI Copilot · Analytics · Billing · Audit UI · Files · Team Chat · Integrations.

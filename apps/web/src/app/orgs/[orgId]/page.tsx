@@ -75,6 +75,12 @@ export default function OrgPage() {
           >
             🔍 Search
           </Link>
+          <Link
+            href={`/orgs/${orgId}/api`}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+          >
+            ⚙ API
+          </Link>
           <NotificationBell />
         </div>
       </div>

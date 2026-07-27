@@ -194,6 +194,12 @@ enum NotificationPriority {
   HIGH
 }
 
+/// Outcome of a single webhook delivery attempt.
+enum WebhookDeliveryStatus {
+  SUCCESS
+  FAILED
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -229,6 +235,7 @@ model User {
   editedDocs              Doc[]         @relation("DocEditor")
   docRevisions            DocRevision[] @relation("RevisionEditor")
   savedSearches           SavedSearch[]
+  apiKeys                 ApiKey[]
 
   @@map("users")
 }
@@ -267,8 +274,10 @@ model Organization {
   memberships   OrganizationMembership[]
   workspaces    Workspace[]
   repositories  Repository[]
-  auditLogs     AuditLog[]
-  savedSearches SavedSearch[]
+  auditLogs        AuditLog[]
+  savedSearches    SavedSearch[]
+  apiKeys          ApiKey[]
+  webhookEndpoints WebhookEndpoint[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -920,6 +929,70 @@ model SavedSearch {
 
   @@index([userId, organizationId])
   @@map("saved_searches")
+}
+
+// ─────────────────────────────────────────────────────────────
+// API Platform — programmatic access. API keys authenticate requests as their
+// creator (so all existing RBAC applies), and webhooks let an org subscribe to
+// the same domain events the internal bus carries: the platform doesn't just
+// consume its own ripples, it can broadcast them to the outside world.
+// ─────────────────────────────────────────────────────────────
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// Creator — requests made with this key authenticate as this user.
+  userId         String
+  name           String
+  /// Non-secret display prefix, e.g. "rant_ab12cd".
+  prefix         String
+  /// SHA-256 of the full key; the raw key is shown once at creation.
+  keyHash        String    @unique
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+model WebhookEndpoint {
+  id             String   @id @default(cuid())
+  organizationId String
+  url            String
+  /// Shared secret used to HMAC-sign delivery bodies.
+  secret         String
+  /// Subscribed event names, or ["*"] for everything.
+  events         String[]
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId])
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id         String                @id @default(cuid())
+  endpointId String
+  event      String
+  payload    Json
+  status     WebhookDeliveryStatus
+  statusCode Int?
+  error      String?
+  createdAt  DateTime              @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, createdAt])
+  @@map("webhook_deliveries")
 }
 
 // ─────────────────────────────────────────────────────────────
