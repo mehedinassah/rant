@@ -51,3 +51,27 @@ export interface DeploymentCompletedPayload {
   status: 'READY' | 'FAILED' | 'CANCELLED';
   url?: string | null;
 }
+
+export const MonitorEvent = {
+  IncidentOpened: 'incident.opened',
+  IncidentResolved: 'incident.resolved',
+} as const;
+
+export interface IncidentOpenedPayload {
+  orgId: string;
+  repoId: string;
+  environmentId: string;
+  monitorId: string;
+  incidentId: string;
+  severity: 'MINOR' | 'MAJOR' | 'CRITICAL';
+  title: string;
+  issueId?: string | null;
+}
+
+export interface IncidentResolvedPayload {
+  orgId: string;
+  repoId: string;
+  environmentId: string;
+  monitorId: string;
+  incidentId: string;
+}

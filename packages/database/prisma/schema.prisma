@@ -140,6 +140,35 @@ enum DeploymentStatus {
   CANCELLED
 }
 
+/// How a monitor probes its target.
+enum MonitorType {
+  HTTP
+  PING
+}
+
+/// Live health of a monitored environment.
+enum MonitorStatus {
+  UP
+  DEGRADED
+  DOWN
+  PAUSED
+  UNKNOWN
+}
+
+/// Lifecycle of an incident opened against a monitor.
+enum IncidentStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+/// How badly an incident is hurting.
+enum IncidentSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -347,6 +376,7 @@ model Issue {
   assignee User?     @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   reporter User      @relation("IssueReporter", fields: [reporterId], references: [id])
   comments Comment[]
+  incident Incident?
 
   @@unique([projectId, number])
   @@index([projectId, status])
@@ -633,6 +663,7 @@ model Environment {
   repository        Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   currentDeployment Deployment?  @relation("CurrentDeployment", fields: [currentDeploymentId], references: [id], onDelete: SetNull)
   deployments       Deployment[] @relation("EnvDeployments")
+  monitor           Monitor?
 
   @@unique([repositoryId, slug])
   @@index([repositoryId])
@@ -664,6 +695,81 @@ model Deployment {
   @@index([environmentId, status])
   @@index([pullRequestId])
   @@map("deployments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Monitoring (Datadog/Better-Uptime-style): monitors · metric samples ·
+// incidents. This closes the DevOps loop — once a deployment goes live,
+// a background scheduler probes its URL, records time-series health, and
+// auto-opens (and resolves) incidents. A critical incident ripples back
+// into project management by opening a bug issue on the linked project.
+// The checks are simulated, like CI runs and deployments.
+// ─────────────────────────────────────────────────────────────
+
+model Monitor {
+  id            String        @id @default(cuid())
+  /// Exactly one monitor per environment.
+  environmentId String        @unique
+  name          String
+  type          MonitorType   @default(HTTP)
+  /// The URL currently being probed (mirrors the live deployment).
+  target        String?
+  /// Nominal probe interval in seconds (descriptive; the scheduler ticks globally).
+  intervalSec   Int           @default(60)
+  isActive      Boolean       @default(true)
+  status        MonitorStatus @default(UNKNOWN)
+  lastCheckedAt DateTime?
+  /// Consecutive failed checks — drives the incident-open threshold.
+  failCount     Int           @default(0)
+  /// When set in the future, checks fail — used to inject an outage for demos.
+  chaosUntil    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  environment Environment    @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  samples     MetricSample[]
+  incidents   Incident[]
+
+  @@index([environmentId])
+  @@map("monitors")
+}
+
+model MetricSample {
+  id         String        @id @default(cuid())
+  monitorId  String
+  status     MonitorStatus
+  /// Response latency in milliseconds (0 when down).
+  latencyMs  Int
+  /// Simulated HTTP status code (200, 502, 503, ...).
+  statusCode Int
+  up         Boolean
+  checkedAt  DateTime      @default(now())
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, checkedAt])
+  @@map("metric_samples")
+}
+
+model Incident {
+  id         String           @id @default(cuid())
+  monitorId  String
+  status     IncidentStatus   @default(OPEN)
+  severity   IncidentSeverity @default(MAJOR)
+  title      String
+  summary    String?
+  /// Bug issue auto-created from this incident (the ripple into project mgmt).
+  issueId    String?          @unique
+  startedAt  DateTime         @default(now())
+  resolvedAt DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  issue   Issue?  @relation(fields: [issueId], references: [id], onDelete: SetNull)
+
+  @@index([monitorId, status])
+  @@map("incidents")
 }
 
 // ─────────────────────────────────────────────────────────────

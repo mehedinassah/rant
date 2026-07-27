@@ -11,14 +11,18 @@ system.
 > a Linear-style project board (Sprints · Epics · Issues · Comments), a
 > GitHub-style repository module (Repos · Branches · Commits · Tags · Releases ·
 > Pull Requests · Reviews · Merge Queue), a GitHub-Actions-style CI/CD engine
-> (Pipelines · Runs · Jobs · Steps · live logs), and Vercel-style Deployments
-> (Environments · deployments · preview URLs · rollback) — all implemented
-> end-to-end with RBAC + audit logging, and with frontends for the board, repos,
-> CI runs and deployments. This is where the platform *connects*: a commit
-> triggers a CI run, a green run gates the PR merge **and** auto-deploys
-> (production on the default branch, a preview URL per pull request) — the whole
-> path from an idea to a live URL inside one system. The remaining modules from
-> the system design (Monitoring, AI Copilot, Billing, …) are on the roadmap.
+> (Pipelines · Runs · Jobs · Steps · live logs), Vercel-style Deployments
+> (Environments · deployments · preview URLs · rollback), and Datadog-style
+> Monitoring (Monitors · time-series metrics · live charts · auto-incidents) —
+> all implemented end-to-end with RBAC + audit logging, and with frontends for
+> the board, repos, CI runs, deployments and monitoring. This is where the
+> platform *connects*: a commit triggers a CI run, a green run gates the PR
+> merge **and** auto-deploys (production on the default branch, a preview URL
+> per pull request), the live URL is then continuously health-checked, and a
+> sustained outage **auto-opens an incident and files a bug on the linked
+> project** — the whole loop from an idea to a live URL to an observed outage
+> inside one system. The remaining modules from the system design
+> (Notifications, AI Copilot, Billing, …) are on the roadmap.
 
 ---
 
@@ -43,18 +47,22 @@ resolves org membership from the `:orgId` route param and enforces `@Roles(...)`
 Every meaningful mutation writes to an immutable `audit_logs` table.
 
 Modules stay decoupled through an internal **event bus** (`@nestjs/event-emitter`):
-one module emits a domain event (`commit.created`, `pull_request.opened`) and
-others react without importing each other. CI/CD and Deployments both listen on
-that bus and push work onto **BullMQ queues** (Redis), where background workers
-execute pipeline runs and deployments step-by-step and stream progress to
-clients over **Server-Sent Events**. A commit → a CI run → a deployment is one
-chain of events, each hop reacting to the last.
+one module emits a domain event (`commit.created`, `pull_request.opened`,
+`pipeline_run.completed`, `deployment.completed`, `incident.opened`) and others
+react without importing each other. CI/CD and Deployments push work onto
+**BullMQ queues** (Redis), where background workers execute pipeline runs and
+deployments step-by-step and stream progress to clients over **Server-Sent
+Events**. Monitoring adds a periodic scheduler that probes every live
+deployment, records time-series health, and opens/resolves incidents — a
+critical incident even ripples *back* into project management by filing a bug
+issue. A commit → a CI run → a deployment → a monitored URL → an incident → a
+bug is one chain of events, each hop reacting to the last.
 
 ## Tech stack
 
 Next.js 15 · NestJS 10 · Prisma 6 · PostgreSQL · Redis · BullMQ (queue + worker) ·
-Server-Sent Events · Turborepo · pnpm · TypeScript · argon2 ·
-JWT (access + rotating refresh tokens).
+Server-Sent Events · in-process scheduler · Turborepo · pnpm · TypeScript ·
+argon2 · JWT (access + rotating refresh tokens).
 
 ## Prerequisites
 
@@ -174,6 +182,21 @@ BUILDING → DEPLOYING → READY and assigns a public URL. **The ripple:** a gre
 CI run auto-deploys — production for a push to the watched branch, a
 PR-scoped preview URL for a pull request.
 
+**Monitors** — `GET .../:repoId/monitors` (per-environment health + 30-min
+rollup) · `GET .../monitors/:monitorId` · `GET .../monitors/:monitorId/metrics`
+(time-series samples) · `GET .../monitors/:monitorId/stream` (Server-Sent
+Events, live metrics) · `PATCH .../monitors/:monitorId` (pause/rename) ·
+`POST .../monitors/:monitorId/simulate` (inject/clear an outage for demos). A
+monitor is created for each environment; once a deployment is live an in-process
+scheduler probes it every few seconds, recording latency/uptime.
+
+**Incidents** — `GET .../:repoId/incidents` · `GET .../incidents/:incidentId` ·
+`POST .../incidents/:incidentId/acknowledge` ·
+`POST .../incidents/:incidentId/resolve`. **The ripple closes the loop:** two
+consecutive failed checks auto-open an incident (CRITICAL on production) and
+file a `BUG` issue on the repo's linked project; a recovered check auto-resolves
+the incident and closes that issue.
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -183,6 +206,5 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Documentation · API Platform · Monitoring ·
-Notifications · AI Copilot · Analytics · Billing · Audit UI · Search · Files ·
-Team Chat · Integrations.
+Notifications · Documentation · API Platform · AI Copilot · Analytics ·
+Billing · Audit UI · Search · Files · Team Chat · Integrations.

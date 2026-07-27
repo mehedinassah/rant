@@ -18,6 +18,7 @@ import { IssuesModule } from './modules/issues/issues.module';
 import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { CiModule } from './modules/ci/ci.module';
 import { DeploymentsModule } from './modules/deployments/deployments.module';
+import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -56,6 +57,7 @@ import { HealthController } from './health.controller';
     RepositoriesModule,
     CiModule,
     DeploymentsModule,
+    MonitoringModule,
   ],
   controllers: [HealthController],
   providers: [

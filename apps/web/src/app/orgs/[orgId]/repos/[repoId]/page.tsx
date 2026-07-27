@@ -123,6 +123,12 @@ export default function RepoPage() {
         >
           Deployments
         </Link>
+        <Link
+          href={`/orgs/${orgId}/repos/${repoId}/monitoring`}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
+        >
+          Monitoring
+        </Link>
       </nav>
 
       {error && <p className="mt-4 text-sm text-red-400">{error}</p>}

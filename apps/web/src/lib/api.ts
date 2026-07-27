@@ -549,6 +549,165 @@ export function streamDeployment(
   return () => controller.abort();
 }
 
+// ── monitoring ──────────────────────────────────────────────
+
+export type MonitorStatus = 'UP' | 'DEGRADED' | 'DOWN' | 'PAUSED' | 'UNKNOWN';
+export type MonitorType = 'HTTP' | 'PING';
+export type IncidentStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
+export type IncidentSeverity = 'MINOR' | 'MAJOR' | 'CRITICAL';
+
+export interface MetricSample {
+  id: string;
+  status: MonitorStatus;
+  latencyMs: number;
+  statusCode: number;
+  up: boolean;
+  checkedAt: string;
+}
+
+export interface MetricsSummary {
+  samples: number;
+  uptimePct: number;
+  avgLatencyMs: number | null;
+  lastLatencyMs: number | null;
+  lastStatusCode: number | null;
+}
+
+export interface Monitor {
+  id: string;
+  name: string;
+  type: MonitorType;
+  target?: string | null;
+  intervalSec: number;
+  isActive: boolean;
+  status: MonitorStatus;
+  lastCheckedAt?: string | null;
+  chaosUntil?: string | null;
+  environment?: {
+    id: string;
+    name: string;
+    slug: string;
+    type: EnvironmentType;
+    isProduction: boolean;
+  } | null;
+  summary?: MetricsSummary;
+  _count?: { incidents: number };
+}
+
+export interface Incident {
+  id: string;
+  status: IncidentStatus;
+  severity: IncidentSeverity;
+  title: string;
+  summary?: string | null;
+  issueId?: string | null;
+  startedAt: string;
+  resolvedAt?: string | null;
+  monitor?: {
+    id: string;
+    name: string;
+    environment?: { id: string; name: string; slug: string } | null;
+  } | null;
+  issue?: { id: string; number: number; title: string; projectId: string } | null;
+}
+
+export interface MonitorSnapshot {
+  monitor: Monitor | null;
+  samples: MetricSample[];
+  incidents: Incident[];
+  summary: MetricsSummary;
+}
+
+export const monitors = {
+  list: (orgId: string, repoId: string) =>
+    api<Monitor[]>(`${repoBase(orgId, repoId)}/monitors`),
+  get: (orgId: string, repoId: string, monitorId: string) =>
+    api<Monitor>(`${repoBase(orgId, repoId)}/monitors/${monitorId}`),
+  metrics: (orgId: string, repoId: string, monitorId: string, minutes?: number) =>
+    api<{ samples: MetricSample[]; summary: MetricsSummary }>(
+      `${repoBase(orgId, repoId)}/monitors/${monitorId}/metrics${minutes ? `?minutes=${minutes}` : ''}`,
+    ),
+  update: (
+    orgId: string,
+    repoId: string,
+    monitorId: string,
+    data: Partial<{ name: string; intervalSec: number; isActive: boolean }>,
+  ) =>
+    api<Monitor>(`${repoBase(orgId, repoId)}/monitors/${monitorId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  simulate: (
+    orgId: string,
+    repoId: string,
+    monitorId: string,
+    kind: 'outage' | 'recover',
+    durationSec?: number,
+  ) =>
+    api<{ success: boolean; chaosUntil: string | null }>(
+      `${repoBase(orgId, repoId)}/monitors/${monitorId}/simulate`,
+      { method: 'POST', body: JSON.stringify({ kind, durationSec }) },
+    ),
+};
+
+export const incidents = {
+  list: (orgId: string, repoId: string) =>
+    api<Incident[]>(`${repoBase(orgId, repoId)}/incidents`),
+  get: (orgId: string, repoId: string, incidentId: string) =>
+    api<Incident>(`${repoBase(orgId, repoId)}/incidents/${incidentId}`),
+  acknowledge: (orgId: string, repoId: string, incidentId: string) =>
+    api<Incident>(`${repoBase(orgId, repoId)}/incidents/${incidentId}/acknowledge`, {
+      method: 'POST',
+    }),
+  resolve: (orgId: string, repoId: string, incidentId: string) =>
+    api<Incident>(`${repoBase(orgId, repoId)}/incidents/${incidentId}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+};
+
+/** Subscribes to a monitor's live SSE stream (fetch-based, JWT-aware, endless). */
+export function streamMonitor(
+  orgId: string,
+  repoId: string,
+  monitorId: string,
+  onUpdate: (snap: MonitorSnapshot) => void,
+): () => void {
+  const controller = new AbortController();
+  const token = getAccessToken();
+  (async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE}${repoBase(orgId, repoId)}/monitors/${monitorId}/stream`,
+        { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal: controller.signal },
+      );
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          try {
+            onUpdate(JSON.parse(line.slice(5).trim()) as MonitorSnapshot);
+          } catch {
+            /* ignore partial frames */
+          }
+        }
+      }
+    } catch {
+      /* aborted or closed — expected */
+    }
+  })();
+  return () => controller.abort();
+}
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
@@ -610,6 +769,32 @@ export const ENV_TYPE_META: Record<EnvironmentType, { label: string; icon: strin
   PREVIEW: { label: 'Preview', icon: '◇' },
   STAGING: { label: 'Staging', icon: '▲' },
   DEVELOPMENT: { label: 'Development', icon: '●' },
+};
+
+export const MONITOR_STATUS_META: Record<
+  MonitorStatus,
+  { label: string; color: string; dot: string; active: boolean }
+> = {
+  UP: { label: 'Operational', color: '#22c55e', dot: '●', active: false },
+  DEGRADED: { label: 'Degraded', color: '#f59e0b', dot: '◐', active: true },
+  DOWN: { label: 'Down', color: '#ef4444', dot: '✕', active: true },
+  PAUSED: { label: 'Paused', color: '#6b7280', dot: '⏸', active: false },
+  UNKNOWN: { label: 'Not checked', color: '#9ca3af', dot: '○', active: false },
+};
+
+export const INCIDENT_STATUS_META: Record<
+  IncidentStatus,
+  { label: string; color: string }
+> = {
+  OPEN: { label: 'Open', color: '#ef4444' },
+  ACKNOWLEDGED: { label: 'Acknowledged', color: '#f59e0b' },
+  RESOLVED: { label: 'Resolved', color: '#22c55e' },
+};
+
+export const SEVERITY_META: Record<IncidentSeverity, { label: string; color: string }> = {
+  CRITICAL: { label: 'Critical', color: '#ef4444' },
+  MAJOR: { label: 'Major', color: '#f59e0b' },
+  MINOR: { label: 'Minor', color: '#eab308' },
 };
 
 export function shortSha(sha?: string | null): string {
