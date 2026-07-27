@@ -32,3 +32,8 @@ Thumbs.db
 # coverage & tmp
 coverage/
 tmp/
+tmp-*.mjs
+
+# unrelated local docs that live alongside this repo (not part of rant)
+on-call-handbook/
+se-trainee-prep/
