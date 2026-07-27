@@ -9,6 +9,7 @@ import {
   organizations,
   type Organization,
 } from '@/lib/api';
+import { NotificationBell } from '@/components/notification-bell';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -62,9 +63,12 @@ export default function DashboardPage() {
         <h1 className="text-xl font-semibold">
           Your organizations
         </h1>
-        <button onClick={signOut} className="text-sm text-white/60 hover:text-white">
-          Sign out
-        </button>
+        <div className="flex items-center gap-4">
+          <NotificationBell />
+          <button onClick={signOut} className="text-sm text-white/60 hover:text-white">
+            Sign out
+          </button>
+        </div>
       </header>
 
       <form

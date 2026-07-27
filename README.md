@@ -12,17 +12,20 @@ system.
 > GitHub-style repository module (Repos · Branches · Commits · Tags · Releases ·
 > Pull Requests · Reviews · Merge Queue), a GitHub-Actions-style CI/CD engine
 > (Pipelines · Runs · Jobs · Steps · live logs), Vercel-style Deployments
-> (Environments · deployments · preview URLs · rollback), and Datadog-style
-> Monitoring (Monitors · time-series metrics · live charts · auto-incidents) —
-> all implemented end-to-end with RBAC + audit logging, and with frontends for
-> the board, repos, CI runs, deployments and monitoring. This is where the
-> platform *connects*: a commit triggers a CI run, a green run gates the PR
-> merge **and** auto-deploys (production on the default branch, a preview URL
-> per pull request), the live URL is then continuously health-checked, and a
-> sustained outage **auto-opens an incident and files a bug on the linked
-> project** — the whole loop from an idea to a live URL to an observed outage
-> inside one system. The remaining modules from the system design
-> (Notifications, AI Copilot, Billing, …) are on the roadmap.
+> (Environments · deployments · preview URLs · rollback), Datadog-style
+> Monitoring (Monitors · time-series metrics · live charts · auto-incidents),
+> and a cross-cutting Notification center (per-user feed · live bell · delivery
+> preferences) — all implemented end-to-end with RBAC + audit logging, and with
+> frontends for the board, repos, CI runs, deployments, monitoring and
+> notifications. This is where the platform *connects*: a commit triggers a CI
+> run, a green run gates the PR merge **and** auto-deploys (production on the
+> default branch, a preview URL per pull request), the live URL is then
+> continuously health-checked, a sustained outage **auto-opens an incident and
+> files a bug on the linked project**, and every one of those events **fans out
+> as a notification** to the right people — the whole loop from an idea to a
+> live URL to an observed outage to a human being told, inside one system. The
+> remaining modules from the system design (AI Copilot, Billing, …) are on the
+> roadmap.
 
 ---
 
@@ -55,8 +58,11 @@ deployments step-by-step and stream progress to clients over **Server-Sent
 Events**. Monitoring adds a periodic scheduler that probes every live
 deployment, records time-series health, and opens/resolves incidents — a
 critical incident even ripples *back* into project management by filing a bug
-issue. A commit → a CI run → a deployment → a monitored URL → an incident → a
-bug is one chain of events, each hop reacting to the last.
+issue. **Notifications** is the pure consumer at the end of the bus: it
+subscribes to CI, deploy, incident and pull-request events and fans each one out
+to the right people's feed (respecting per-category delivery preferences). A
+commit → a CI run → a deployment → a monitored URL → an incident → a bug → a
+notification is one chain of events, each hop reacting to the last.
 
 ## Tech stack
 
@@ -197,6 +203,16 @@ consecutive failed checks auto-open an incident (CRITICAL on production) and
 file a `BUG` issue on the repo's linked project; a recovered check auto-resolves
 the incident and closes that issue.
 
+**Notifications** (user-scoped, no `:orgId`) — `GET /notifications`
+(`?unread=true`) · `GET /notifications/unread-count` ·
+`GET /notifications/stream` (Server-Sent Events, live bell) ·
+`POST /notifications/:id/read` · `POST /notifications/read-all` ·
+`DELETE /notifications/:id` · `GET|PUT /notifications/preferences`. A pure
+consumer of the event bus: a failed CI run, a deploy, an opened/resolved
+incident and a new pull request each fan out to the relevant members' feed
+(by org role), respecting per-category in-app/email preferences. Email is a
+logged stub until a real provider is wired up.
+
 ## Roles (RBAC)
 
 `OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
@@ -206,5 +222,5 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Notifications · Documentation · API Platform · AI Copilot · Analytics ·
+Documentation · API Platform · AI Copilot · Analytics ·
 Billing · Audit UI · Search · Files · Team Chat · Integrations.

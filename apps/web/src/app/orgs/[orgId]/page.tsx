@@ -12,6 +12,7 @@ import {
   type Workspace,
 } from '@/lib/api';
 import { useRequireAuth } from '@/lib/use-require-auth';
+import { NotificationBell } from '@/components/notification-bell';
 
 interface WorkspaceWithProjects extends Workspace {
   projects: Project[];
@@ -63,9 +64,12 @@ export default function OrgPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <Link href="/dashboard" className="text-sm text-white/50 hover:text-white">
-        ← All organizations
-      </Link>
+      <div className="flex items-start justify-between">
+        <Link href="/dashboard" className="text-sm text-white/50 hover:text-white">
+          ← All organizations
+        </Link>
+        <NotificationBell />
+      </div>
       <h1 className="mt-3 text-2xl font-semibold">{org?.name ?? 'Organization'}</h1>
       <p className="text-sm text-white/40">/{org?.slug}</p>
 

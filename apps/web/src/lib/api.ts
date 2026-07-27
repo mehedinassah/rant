@@ -708,6 +708,97 @@ export function streamMonitor(
   return () => controller.abort();
 }
 
+// ── notifications ───────────────────────────────────────────
+
+export type NotificationType =
+  | 'CI_FAILED'
+  | 'DEPLOYMENT_READY'
+  | 'DEPLOYMENT_FAILED'
+  | 'INCIDENT_OPENED'
+  | 'INCIDENT_RESOLVED'
+  | 'PULL_REQUEST_OPENED';
+
+export type NotificationCategory = 'CI' | 'DEPLOYMENT' | 'INCIDENT' | 'PULL_REQUEST';
+export type NotificationPriority = 'LOW' | 'NORMAL' | 'HIGH';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  category: NotificationCategory;
+  priority: NotificationPriority;
+  title: string;
+  body?: string | null;
+  organizationId?: string | null;
+  repositoryId?: string | null;
+  linkPath?: string | null;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface NotificationPreference {
+  category: NotificationCategory;
+  inApp: boolean;
+  email: boolean;
+}
+
+export interface NotificationSnapshot {
+  unread: number;
+  latest: Notification[];
+}
+
+export const notifications = {
+  list: (unreadOnly = false) =>
+    api<Notification[]>(`/notifications${unreadOnly ? '?unread=true' : ''}`),
+  unreadCount: () => api<{ count: number }>('/notifications/unread-count'),
+  markRead: (id: string) => api<{ success: boolean }>(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllRead: () =>
+    api<{ success: boolean; count: number }>('/notifications/read-all', { method: 'POST' }),
+  remove: (id: string) => api<{ success: boolean }>(`/notifications/${id}`, { method: 'DELETE' }),
+  getPreferences: () => api<NotificationPreference[]>('/notifications/preferences'),
+  updatePreferences: (preferences: NotificationPreference[]) =>
+    api<NotificationPreference[]>('/notifications/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ preferences }),
+    }),
+};
+
+/** Subscribes to the live notification stream (unread count + latest). */
+export function streamNotifications(onUpdate: (snap: NotificationSnapshot) => void): () => void {
+  const controller = new AbortController();
+  const token = getAccessToken();
+  (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/notifications/stream`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        signal: controller.signal,
+      });
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          try {
+            onUpdate(JSON.parse(line.slice(5).trim()) as NotificationSnapshot);
+          } catch {
+            /* ignore partial frames */
+          }
+        }
+      }
+    } catch {
+      /* aborted or closed — expected */
+    }
+  })();
+  return () => controller.abort();
+}
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
@@ -795,6 +886,28 @@ export const SEVERITY_META: Record<IncidentSeverity, { label: string; color: str
   CRITICAL: { label: 'Critical', color: '#ef4444' },
   MAJOR: { label: 'Major', color: '#f59e0b' },
   MINOR: { label: 'Minor', color: '#eab308' },
+};
+
+export const NOTIFICATION_META: Record<
+  NotificationType,
+  { label: string; icon: string; color: string }
+> = {
+  CI_FAILED: { label: 'CI failed', icon: '✕', color: '#ef4444' },
+  DEPLOYMENT_READY: { label: 'Deployed', icon: '▲', color: '#22c55e' },
+  DEPLOYMENT_FAILED: { label: 'Deploy failed', icon: '▲', color: '#ef4444' },
+  INCIDENT_OPENED: { label: 'Incident', icon: '◉', color: '#ef4444' },
+  INCIDENT_RESOLVED: { label: 'Resolved', icon: '◉', color: '#22c55e' },
+  PULL_REQUEST_OPENED: { label: 'Pull request', icon: '⑃', color: '#6d5efc' },
+};
+
+export const NOTIFICATION_CATEGORY_META: Record<
+  NotificationCategory,
+  { label: string; description: string }
+> = {
+  CI: { label: 'Continuous integration', description: 'Pipeline run failures' },
+  DEPLOYMENT: { label: 'Deployments', description: 'Releases and deploy failures' },
+  INCIDENT: { label: 'Incidents', description: 'Outages opened and resolved' },
+  PULL_REQUEST: { label: 'Pull requests', description: 'New pull requests to review' },
 };
 
 export function shortSha(sha?: string | null): string {

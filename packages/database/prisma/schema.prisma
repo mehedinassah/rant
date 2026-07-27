@@ -169,6 +169,31 @@ enum IncidentSeverity {
   CRITICAL
 }
 
+/// The specific event a notification represents.
+enum NotificationType {
+  CI_FAILED
+  DEPLOYMENT_READY
+  DEPLOYMENT_FAILED
+  INCIDENT_OPENED
+  INCIDENT_RESOLVED
+  PULL_REQUEST_OPENED
+}
+
+/// Grouping used for per-user delivery preferences.
+enum NotificationCategory {
+  CI
+  DEPLOYMENT
+  INCIDENT
+  PULL_REQUEST
+}
+
+/// UI emphasis / delivery urgency.
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -198,6 +223,8 @@ model User {
   reviews             Review[]      @relation("ReviewAuthor")
   triggeredRuns       PipelineRun[] @relation("RunTriggeredBy")
   triggeredDeployments Deployment[] @relation("DeployTriggeredBy")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("users")
 }
@@ -770,6 +797,52 @@ model Incident {
 
   @@index([monitorId, status])
   @@map("incidents")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Notifications — the module that finally makes every ripple visible to a
+// human. It's a pure consumer of the event bus: a failed CI run, a production
+// deploy, an opened/resolved incident, a new pull request all fan out to the
+// right people's in-app feed (respecting per-category delivery preferences).
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id             String               @id @default(cuid())
+  userId         String
+  type           NotificationType
+  category       NotificationCategory
+  priority       NotificationPriority @default(NORMAL)
+  title          String
+  body           String?
+  organizationId String?
+  repositoryId   String?
+  /// Frontend deep-link to the thing that happened.
+  linkPath       String?
+  targetType     String?
+  targetId       String?
+  readAt         DateTime?
+  createdAt      DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id        String               @id @default(cuid())
+  userId    String
+  category  NotificationCategory
+  inApp     Boolean              @default(true)
+  email     Boolean              @default(false)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@map("notification_preferences")
 }
 
 // ─────────────────────────────────────────────────────────────
