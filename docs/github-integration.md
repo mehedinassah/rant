@@ -49,6 +49,10 @@ cached in memory/Redis (they expire hourly) or stored **encrypted** at rest.
 
 ## G0 — GitHub App registration & config (no code) · ~0.5d
 
+> 📘 **Step-by-step walkthrough:** [`docs/github-setup.md`](github-setup.md) — register
+> the App, collect the six secrets, fill `.env`, and connect your first repo.
+
+
 **Do:** Register a GitHub App (Settings → Developer settings → GitHub Apps).
 - Permissions (read-only): Contents, Metadata, Pull requests, Checks, Actions, Members.
 - Subscribe to events: `push`, `pull_request`, `pull_request_review`, `workflow_run`,

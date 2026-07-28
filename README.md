@@ -170,8 +170,9 @@ GitHub App is installed per org; verified webhooks are deduped and enqueued, the
 a worker maps real pushes, PRs, reviews and Actions runs onto rant's models and
 **re-emits the existing domain events** — so a real failed CI run opens an
 incident, posts to `#activity` and notifies the team through the same ripple as
-the simulated modules. See [`docs/github-integration.md`](docs/github-integration.md).
-Disabled until a GitHub App is configured (`FEATURE_GITHUB` / `GITHUB_*` env).
+the simulated modules. See the [design spec](docs/github-integration.md) and the
+[setup walkthrough](docs/github-setup.md). Disabled until a GitHub App is configured
+(`FEATURE_GITHUB` / `GITHUB_*` env).
 
 **Workspaces** — `GET|POST /organizations/:orgId/workspaces` ·
 `GET|PATCH|DELETE /organizations/:orgId/workspaces/:workspaceId`
