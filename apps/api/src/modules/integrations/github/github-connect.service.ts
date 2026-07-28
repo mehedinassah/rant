@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../../common/prisma/prisma.service';
@@ -44,6 +49,16 @@ export class GithubConnectService {
 
   /** Records a new installation and enqueues backfill. Idempotent per org. */
   async completeInstall(orgId: string, actorId: string, installationId: string) {
+    // Prevent hijacking: an installation may only be bound to one org. If it's
+    // already claimed elsewhere, refuse rather than silently rebinding.
+    const claimed = await this.prisma.githubInstallation.findUnique({
+      where: { installationId: BigInt(installationId) },
+      select: { organizationId: true },
+    });
+    if (claimed && claimed.organizationId !== orgId) {
+      throw new ForbiddenException('This GitHub installation is linked to another organization');
+    }
+
     const meta = await this.auth.getInstallationMeta(installationId);
     const installation = await this.prisma.githubInstallation.upsert({
       where: { organizationId: orgId },

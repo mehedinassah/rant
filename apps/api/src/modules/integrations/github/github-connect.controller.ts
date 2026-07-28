@@ -11,13 +11,13 @@ export class GithubConnectController {
 
   // ── Org-scoped install management (managers/admins) ──────────────────────
 
-  @Roles(OrgRole.MANAGER)
+  @Roles(OrgRole.ADMIN)
   @Get('organizations/:orgId/integrations/github/install-url')
   installUrl(@Param('orgId') orgId: string) {
     return this.connect.installUrl(orgId);
   }
 
-  @Roles(OrgRole.MANAGER)
+  @Roles(OrgRole.ADMIN)
   @Post('organizations/:orgId/integrations/github/complete-install')
   completeInstall(
     @Param('orgId') orgId: string,
@@ -33,13 +33,13 @@ export class GithubConnectController {
     return this.connect.status(orgId);
   }
 
-  @Roles(OrgRole.MANAGER)
+  @Roles(OrgRole.ADMIN)
   @Post('organizations/:orgId/integrations/github/resync')
   resync(@Param('orgId') orgId: string, @CurrentUser('userId') userId: string) {
     return this.connect.resync(orgId, userId);
   }
 
-  @Roles(OrgRole.MANAGER)
+  @Roles(OrgRole.ADMIN)
   @Delete('organizations/:orgId/integrations/github')
   disconnect(@Param('orgId') orgId: string, @CurrentUser('userId') userId: string) {
     return this.connect.disconnect(orgId, userId);
