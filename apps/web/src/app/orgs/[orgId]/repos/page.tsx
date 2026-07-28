@@ -83,7 +83,17 @@ export default function ReposPage() {
               className="rounded-xl border border-white/10 bg-[var(--color-ink-soft)] p-4 transition hover:border-[var(--color-accent)]/50 hover:bg-white/5"
             >
               <div className="flex items-center justify-between">
-                <h3 className="font-medium">{r.name}</h3>
+                <h3 className="flex items-center gap-1.5 font-medium">
+                  {r.name}
+                  {r.source === 'GITHUB' && (
+                    <span
+                      title="Synced from GitHub"
+                      className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-white/60"
+                    >
+                       GitHub
+                    </span>
+                  )}
+                </h3>
                 <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-white/60">
                   {r.visibility.toLowerCase()}
                 </span>

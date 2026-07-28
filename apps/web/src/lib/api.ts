@@ -353,6 +353,7 @@ export interface Repository {
   description?: string | null;
   visibility: string;
   defaultBranch: string;
+  source?: 'NATIVE' | 'GITHUB';
   project?: { id: string; key: string; name: string } | null;
   _count?: { branches: number; pullRequests: number; commits: number };
 }
@@ -405,6 +406,49 @@ export interface RunDetail extends RunSummary {
 
 const repoBase = (orgId: string, repoId: string) =>
   `/organizations/${orgId}/repositories/${repoId}`;
+
+export interface GithubStatus {
+  connected: boolean;
+  accountLogin?: string;
+  installationId?: string;
+  syncedAt?: string | null;
+  repoCount?: number;
+}
+
+export interface GithubAccount {
+  linked: boolean;
+  login?: string;
+  avatarUrl?: string | null;
+}
+
+export const github = {
+  status: (orgId: string) =>
+    api<GithubStatus>(`/organizations/${orgId}/integrations/github/status`),
+  installUrl: (orgId: string) =>
+    api<{ url: string }>(`/organizations/${orgId}/integrations/github/install-url`),
+  completeInstall: (orgId: string, installationId: string) =>
+    api<{ connected: boolean; accountLogin: string }>(
+      `/organizations/${orgId}/integrations/github/complete-install`,
+      { method: 'POST', body: JSON.stringify({ installationId }) },
+    ),
+  resync: (orgId: string) =>
+    api<{ queued: boolean }>(`/organizations/${orgId}/integrations/github/resync`, {
+      method: 'POST',
+    }),
+  disconnect: (orgId: string) =>
+    api<{ connected: boolean }>(`/organizations/${orgId}/integrations/github`, {
+      method: 'DELETE',
+    }),
+  oauthUrl: () => api<{ url: string }>(`/integrations/github/oauth/url`),
+  account: () => api<GithubAccount>(`/integrations/github/account`),
+  linkAccount: (code: string) =>
+    api<{ login: string; avatarUrl?: string | null }>(`/integrations/github/account`, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  unlinkAccount: () =>
+    api<{ linked: boolean }>(`/integrations/github/account`, { method: 'DELETE' }),
+};
 
 export const repositories = {
   list: (orgId: string) => api<Repository[]>(`/organizations/${orgId}/repositories`),
