@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { auth, setTokens } from '@/lib/api';
+import { auth, safeRedirect, setTokens } from '@/lib/api';
 import { AuthShell, Field } from '@/components/auth-ui';
 
 export default function RegisterPage() {
@@ -14,6 +14,8 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const next = safeRedirect();
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -21,7 +23,7 @@ export default function RegisterPage() {
     try {
       const res = await auth.register({ name, email, password });
       setTokens(res.accessToken, res.refreshToken);
-      router.push('/dashboard');
+      router.push(next ?? '/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

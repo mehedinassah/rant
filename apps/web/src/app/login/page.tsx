@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { auth, setTokens } from '@/lib/api';
+import { auth, safeRedirect, setTokens } from '@/lib/api';
 import { AuthShell, Field } from '@/components/auth-ui';
 
 export default function LoginPage() {
@@ -13,6 +13,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const next = safeRedirect();
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -20,7 +22,7 @@ export default function LoginPage() {
     try {
       const res = await auth.login({ email, password });
       setTokens(res.accessToken, res.refreshToken);
-      router.push('/dashboard');
+      router.push(next ?? '/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -44,7 +46,10 @@ export default function LoginPage() {
       </form>
       <p className="mt-6 text-center text-sm text-white/50">
         No account?{' '}
-        <Link href="/register" className="text-[var(--color-accent-soft)] hover:underline">
+        <Link
+          href={next ? `/register?redirect=${encodeURIComponent(next)}` : '/register'}
+          className="text-[var(--color-accent-soft)] hover:underline"
+        >
           Create one
         </Link>
       </p>

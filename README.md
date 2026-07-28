@@ -154,6 +154,14 @@ Base URL: `/api/v1`
 `GET|POST /organizations/:orgId/members` ·
 `PATCH|DELETE /organizations/:orgId/members/:userId`
 
+**Invitations** — `GET|POST /organizations/:orgId/invitations` ·
+`DELETE /organizations/:orgId/invitations/:invitationId` ·
+`GET /invitations/:token` (public preview) ·
+`POST /invitations/:token/accept`. Email-first: an invite issues a tokenised,
+7-day-expiry link (delivered through a pluggable mail stub) that survives the
+invitee's sign-up; accepting is gated on the plan's seat limit and matched to
+the invited email address.
+
 **Workspaces** — `GET|POST /organizations/:orgId/workspaces` ·
 `GET|PATCH|DELETE /organizations/:orgId/workspaces/:workspaceId`
 
@@ -317,12 +325,15 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-All 18 modules from the system design are implemented, plus a first hardening
-pass: **security headers + rate limiting**, an **Audit UI** with **pagination**,
-and a **unit test suite wired into GitHub Actions CI**.
+All 18 modules from the system design are implemented, plus a hardening pass:
+**security headers + rate limiting**, an **Audit UI** with **pagination**, a
+**unit test suite wired into GitHub Actions CI**, and a **token-based
+member-invite flow** (email-first invitations with an accept page and a
+pluggable mail stub).
 
 What remains is deeper production-hardening rather than new surface area:
 swapping the simulated workers for real runners/hosts (containers, a real host,
-a git backend), broader test coverage (integration + e2e), member-invite emails
-via a real provider, object storage (S3/R2) in place of in-database bytes,
-WebSockets for richer real-time, and OpenTelemetry for observing rant itself.
+a git backend), broader test coverage (integration + e2e), wiring the mail stub
+to a real provider (Resend/SES), object storage (S3/R2) in place of in-database
+bytes, WebSockets for richer real-time, and OpenTelemetry for observing rant
+itself.

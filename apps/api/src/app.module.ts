@@ -7,10 +7,12 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuditModule } from './common/audit/audit.module';
+import { MailModule } from './common/mail/mail.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { InvitationsModule } from './modules/invitations/invitations.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SprintsModule } from './modules/sprints/sprints.module';
@@ -61,8 +63,10 @@ import { HealthController } from './health.controller';
     }),
     PrismaModule,
     AuditModule,
+    MailModule,
     AuthModule,
     OrganizationsModule,
+    InvitationsModule,
     WorkspacesModule,
     ProjectsModule,
     SprintsModule,

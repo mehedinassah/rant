@@ -19,6 +19,17 @@ export function clearTokens(): void {
   window.localStorage.removeItem(REFRESH_KEY);
 }
 
+/**
+ * Reads a `?redirect=` query param, returning it only when it's a safe
+ * same-origin path (must start with a single `/`) to prevent open redirects.
+ */
+export function safeRedirect(): string | null {
+  if (typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('redirect');
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
 interface ApiError {
   message: string | string[];
 }
@@ -70,6 +81,46 @@ export interface Organization {
   slug: string;
   role?: string;
   _count?: { memberships: number; workspaces: number };
+}
+
+export const ORG_ROLES = [
+  'ADMIN',
+  'MANAGER',
+  'DEVELOPER',
+  'QA',
+  'DEVOPS',
+  'VIEWER',
+  'GUEST',
+] as const;
+export type OrgRole = (typeof ORG_ROLES)[number] | 'OWNER';
+
+export interface Member {
+  id: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  user: { id: string; name: string; email: string; avatarUrl?: string | null };
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+  expiresAt: string;
+  createdAt: string;
+  acceptedAt?: string | null;
+  invitedBy?: { id: string; name: string } | null;
+}
+
+export interface InvitationPreview {
+  email: string;
+  role: string;
+  organizationName: string;
+  organizationSlug: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+  expired: boolean;
+  expiresAt: string;
 }
 
 export interface Workspace {
@@ -164,6 +215,32 @@ export const organizations = {
   get: (orgId: string) => api<Organization>(`/organizations/${orgId}`),
   create: (data: { name: string; slug: string }) =>
     api<Organization>('/organizations', { method: 'POST', body: JSON.stringify(data) }),
+  members: (orgId: string) => api<Member[]>(`/organizations/${orgId}/members`),
+  updateMemberRole: (orgId: string, userId: string, role: string) =>
+    api<Member>(`/organizations/${orgId}/members/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (orgId: string, userId: string) =>
+    api<{ success: boolean }>(`/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }),
+};
+
+export const invitations = {
+  list: (orgId: string) => api<Invitation[]>(`/organizations/${orgId}/invitations`),
+  create: (orgId: string, data: { email: string; role: string }) =>
+    api<Invitation>(`/organizations/${orgId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  revoke: (orgId: string, invitationId: string) =>
+    api<{ success: boolean }>(`/organizations/${orgId}/invitations/${invitationId}`, {
+      method: 'DELETE',
+    }),
+  preview: (token: string) => api<InvitationPreview>(`/invitations/${token}`),
+  accept: (token: string) =>
+    api<{ organizationId: string; role: string }>(`/invitations/${token}/accept`, {
+      method: 'POST',
+    }),
 };
 
 export const workspaces = {
