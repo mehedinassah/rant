@@ -19,11 +19,13 @@ system.
 > full version history), unified Search (one box across issues, projects,
 > repos, PRs, docs and incidents), an API Platform (programmatic API keys ·
 > OpenAPI docs · outbound webhooks), an Analytics dashboard (deploy
-> frequency · CI pass rate · MTTR · issue throughput across every module), and
-> Billing (plans · subscriptions · invoices · plan-gated limits) — all
-> implemented end-to-end with RBAC + audit logging, and with frontends for the
-> board, repos, CI runs, deployments, monitoring, notifications, docs, search,
-> API settings, analytics and billing. This is where the
+> frequency · CI pass rate · MTTR · issue throughput across every module),
+> Billing (plans · subscriptions · invoices · plan-gated limits), and a grounded
+> AI Copilot (a chat assistant that answers from your live data and cites the
+> records) — all implemented end-to-end with RBAC + audit logging, and with
+> frontends for the board, repos, CI runs, deployments, monitoring,
+> notifications, docs, search, API settings, analytics, billing and copilot.
+> This is where the
 > platform *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
@@ -245,6 +247,16 @@ across every module: totals, issue throughput + status mix, deployment frequency
 most-deployed repos). No new storage — it aggregates the data the other modules
 already produce.
 
+**Copilot** — `POST .../copilot/ask` (message + optional conversationId) ·
+`GET .../copilot/conversations` · `GET|DELETE .../copilot/conversations/:id` ·
+`GET .../copilot/suggestions`. A **grounded** assistant: it classifies intent
+and answers from live org data — “what’s broken?” lists open incidents, down
+monitors and recent CI/deploy failures; “what shipped this week?” counts
+deployments, merged PRs and completed issues; “what should I work on?” returns
+your open issues by priority; “give me a summary” snapshots the org. Every
+answer **cites the exact records** with deep-links, and conversations are saved.
+(No external LLM — the reasoning is deterministic and data-backed.)
+
 **Billing** — `GET .../billing/plans` · `GET .../billing/subscription` ·
 `GET .../billing/usage` · `GET .../billing/invoices` ·
 `POST .../billing/subscription` (change plan) ·
@@ -273,4 +285,4 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-AI Copilot · Audit UI · Files · Team Chat · Integrations.
+Audit UI · Files · Team Chat · Integrations.

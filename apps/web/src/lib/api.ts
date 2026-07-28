@@ -1122,6 +1122,48 @@ export function formatPrice(cents: number): string {
   return cents === 0 ? 'Free' : `$${(cents / 100).toFixed(0)}/mo`;
 }
 
+// ── AI copilot ──────────────────────────────────────────────
+
+export interface Citation {
+  label: string;
+  linkPath: string;
+}
+
+export interface CopilotMessage {
+  id: string;
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+  citations?: Citation[] | null;
+  createdAt: string;
+}
+
+export interface CopilotConversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CopilotConversationDetail extends CopilotConversation {
+  messages: CopilotMessage[];
+}
+
+const copilotBase = (orgId: string) => `/organizations/${orgId}/copilot`;
+
+export const copilot = {
+  suggestions: (orgId: string) => api<string[]>(`${copilotBase(orgId)}/suggestions`),
+  conversations: (orgId: string) => api<CopilotConversation[]>(`${copilotBase(orgId)}/conversations`),
+  conversation: (orgId: string, id: string) =>
+    api<CopilotConversationDetail>(`${copilotBase(orgId)}/conversations/${id}`),
+  remove: (orgId: string, id: string) =>
+    api<{ success: boolean }>(`${copilotBase(orgId)}/conversations/${id}`, { method: 'DELETE' }),
+  ask: (orgId: string, message: string, conversationId?: string) =>
+    api<{ conversationId: string; message: CopilotMessage }>(`${copilotBase(orgId)}/ask`, {
+      method: 'POST',
+      body: JSON.stringify({ message, conversationId }),
+    }),
+};
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [

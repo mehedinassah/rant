@@ -25,6 +25,7 @@ import { SearchModule } from './modules/search/search.module';
 import { ApiPlatformModule } from './modules/api-platform/api-platform.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { CopilotModule } from './modules/copilot/copilot.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -70,6 +71,7 @@ import { HealthController } from './health.controller';
     ApiPlatformModule,
     AnalyticsModule,
     BillingModule,
+    CopilotModule,
   ],
   controllers: [HealthController],
   providers: [
