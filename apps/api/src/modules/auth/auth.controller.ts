@@ -1,20 +1,26 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshDto, RegisterDto } from './dto/auth.dto';
 
+/** Credential endpoints get a tighter limit (10/min per IP) to blunt brute force. */
+const AUTH_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Throttle(AUTH_THROTTLE)
   @Public()
   @Post('register')
   register(@Body() dto: RegisterDto, @Req() req: Request) {
     return this.auth.register(dto, this.ctx(req));
   }
 
+  @Throttle(AUTH_THROTTLE)
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')

@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuditModule } from './common/audit/audit.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -37,6 +38,9 @@ import { HealthController } from './health.controller';
       // Monorepo root .env (cwd is apps/api at runtime; also try local).
       envFilePath: [join(process.cwd(), '../../.env'), join(process.cwd(), '.env')],
     }),
+    // Rate limiting — 120 requests / minute per IP by default. Auth routes are
+    // tightened further with @Throttle at the controller.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     // Internal event bus — lets modules react to each other's domain events
     // (e.g. CI starts a run when a commit lands) without importing each other.
     EventEmitterModule.forRoot(),
@@ -79,6 +83,8 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
   providers: [
+    // Rate limiting runs first, before any auth work.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     // JWT auth is on by default; opt out per-route with @Public().
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     // RolesGuard runs next: enforces org membership + @Roles on `:orgId` routes.
