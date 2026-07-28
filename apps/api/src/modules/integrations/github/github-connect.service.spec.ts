@@ -8,7 +8,7 @@ function setup(claimedBy: string | null = null) {
       upsert: jest.fn().mockResolvedValue({ id: 'inst1', accountLogin: 'acme' }),
     },
   };
-  const config = { appSlug: 'rant', clientId: 'cid' } as never;
+  const config = { appSlug: 'rant', clientId: 'cid', isEnabled: () => true } as never;
   const auth = { getInstallationMeta: jest.fn().mockResolvedValue({ accountLogin: 'acme' }) };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const queue = { add: jest.fn().mockResolvedValue(undefined) };
@@ -38,5 +38,19 @@ describe('GithubConnectService.completeInstall', () => {
     const { svc, prisma } = setup('orgB');
     await expect(svc.completeInstall('orgA', 'user1', '999')).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.githubInstallation.upsert).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the integration is disabled by flag', async () => {
+    const prisma = { githubInstallation: { findUnique: jest.fn(), upsert: jest.fn() } };
+    const config = { appSlug: 'rant', clientId: 'cid', isEnabled: () => false } as never;
+    const svc = new GithubConnectService(
+      prisma as never,
+      config,
+      { getInstallationMeta: jest.fn() } as never,
+      { record: jest.fn() } as never,
+      { add: jest.fn() } as never,
+    );
+    await expect(svc.completeInstall('orgA', 'user1', '999')).rejects.toThrow(/not enabled/);
+    expect(prisma.githubInstallation.findUnique).not.toHaveBeenCalled();
   });
 });

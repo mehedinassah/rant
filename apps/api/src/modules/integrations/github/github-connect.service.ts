@@ -32,13 +32,22 @@ export class GithubConnectService {
     return process.env.WEB_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
   }
 
+  /** Master gate: refuse cleanly when the integration is flagged/left off. */
+  private assertEnabled(): void {
+    if (!this.config.isEnabled()) {
+      throw new BadRequestException('GitHub integration is not enabled on this server');
+    }
+  }
+
   installUrl(orgId: string): { url: string } {
+    this.assertEnabled();
     if (!this.config.appSlug) throw new BadRequestException('GitHub App slug not configured');
     const state = encodeURIComponent(orgId);
     return { url: `https://github.com/apps/${this.config.appSlug}/installations/new?state=${state}` };
   }
 
   oauthUrl(userId: string): { url: string } {
+    this.assertEnabled();
     if (!this.config.clientId) throw new BadRequestException('GitHub OAuth not configured');
     const redirect = encodeURIComponent(`${this.webUrl()}/settings/github/callback`);
     const state = encodeURIComponent(`oauth:${userId}`);
@@ -49,6 +58,7 @@ export class GithubConnectService {
 
   /** Records a new installation and enqueues backfill. Idempotent per org. */
   async completeInstall(orgId: string, actorId: string, installationId: string) {
+    this.assertEnabled();
     // Prevent hijacking: an installation may only be bound to one org. If it's
     // already claimed elsewhere, refuse rather than silently rebinding.
     const claimed = await this.prisma.githubInstallation.findUnique({
