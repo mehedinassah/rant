@@ -7,7 +7,7 @@ software. Not a GitHub clone. Not a Jira clone. Not a Vercel clone — a complet
 software engineering ecosystem where every action ripples through the whole
 system.
 
-> Status: **early foundation.** Auth · Organizations · Workspaces · Projects,
+> Status: **all 18 modules implemented.** Auth · Organizations · Workspaces · Projects,
 > a Linear-style project board (Sprints · Epics · Issues · Comments), a
 > GitHub-style repository module (Repos · Branches · Commits · Tags · Releases ·
 > Pull Requests · Reviews · Merge Queue), a GitHub-Actions-style CI/CD engine
@@ -22,19 +22,20 @@ system.
 > frequency · CI pass rate · MTTR · issue throughput across every module),
 > Billing (plans · subscriptions · invoices · plan-gated limits), a grounded
 > AI Copilot (a chat assistant that answers from your live data and cites the
-> records), and Files (real multipart upload/download, attachable to any entity)
-> — all implemented end-to-end with RBAC + audit logging, and with frontends for
+> records), Files (real multipart upload/download, attachable to any entity),
+> and Team Chat (channels + an activity feed the platform posts into itself) —
+> all implemented end-to-end with RBAC + audit logging, and with frontends for
 > the board, repos, CI runs, deployments, monitoring, notifications, docs,
-> search, API settings, analytics, billing, copilot and files. This is where the
-> platform *connects*: a commit triggers a CI
+> search, API settings, analytics, billing, copilot, files and chat. This is
+> where the platform *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
 > continuously health-checked, a sustained outage **auto-opens an incident,
 > files a bug on the linked project, drafts a postmortem page** in that
-> workspace's docs, and **fans out as a notification** to the right people — the
-> whole loop from an idea to a live URL to an observed outage to a human being
-> told, inside one system. The remaining modules from the system design (AI
-> Copilot, Billing, …) are on the roadmap.
+> workspace's docs, **fans out as a notification** to the right people, **posts to
+> the team's activity channel**, and **fires a signed webhook** to external
+> systems — the whole loop from an idea to a live URL to an observed outage to
+> everyone (and everything) that needs to know, inside one system.
 
 ---
 
@@ -70,8 +71,10 @@ critical incident even ripples *back* into project management by filing a bug
 issue. **Notifications** is the pure consumer at the end of the bus: it
 subscribes to CI, deploy, incident and pull-request events and fans each one out
 to the right people's feed (respecting per-category delivery preferences). The
-**API Platform** then re-broadcasts those same events as HMAC-signed outbound
-webhooks, so the ripple reaches external systems too. A commit → a CI run → a
+**API Platform** re-broadcasts those same events as HMAC-signed outbound
+webhooks, and **Team Chat** posts them as system messages into the org's
+activity channel — so the ripple reaches external systems *and* the team's
+conversation. A commit → a CI run → a
 deployment → a monitored URL → an incident → a bug → a notification → a webhook
 is one chain of events, each hop reacting to the last.
 
@@ -247,6 +250,12 @@ across every module: totals, issue throughput + status mix, deployment frequency
 most-deployed repos). No new storage — it aggregates the data the other modules
 already produce.
 
+**Team Chat** — `GET|POST .../channels` · `GET|POST .../channels/:id/messages` ·
+`GET .../channels/:id/stream` (Server-Sent Events, live thread). Each org gets a
+`#general` channel and a system `#activity` channel; the **integration layer**
+posts SYSTEM messages into `#activity` whenever a deploy, incident, CI failure
+or pull request fires — the event bus flowing straight into the conversation.
+
 **Files** — `POST .../files` (multipart upload, field `file`, optional
 `targetType`/`targetId` to attach) · `GET .../files` (list, filterable by
 target) · `GET .../files/:fileId` · `GET .../files/:fileId/download` (streams the
@@ -292,4 +301,10 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Audit UI · Team Chat · Integrations.
+All 18 modules from the system design are implemented. What remains is
+production-hardening rather than new surface area: swapping the simulated
+workers for real runners/hosts (containers, a real host, a git backend), a
+committed automated test suite, member-invite emails (via a real provider),
+pagination + rate limiting, an Audit UI over the `audit_logs` already being
+written, object storage (S3/R2) in place of in-database bytes, WebSockets for
+richer real-time, and OpenTelemetry for observing rant itself.

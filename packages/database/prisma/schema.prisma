@@ -228,6 +228,12 @@ enum CopilotRole {
   ASSISTANT
 }
 
+/// A human-authored chat message vs. one posted by the platform itself.
+enum ChatMessageKind {
+  USER
+  SYSTEM
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & Auth
 // ─────────────────────────────────────────────────────────────
@@ -266,6 +272,7 @@ model User {
   apiKeys                 ApiKey[]
   copilotChats            CopilotConversation[]
   uploadedFiles           FileObject[]  @relation("FileUploader")
+  chatMessages            ChatMessage[] @relation("ChatAuthor")
 
   @@map("users")
 }
@@ -312,6 +319,7 @@ model Organization {
   invoices         Invoice[]
   copilotChats     CopilotConversation[]
   files            FileObject[]
+  channels         Channel[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -1137,6 +1145,45 @@ model FileObject {
   @@index([organizationId, createdAt])
   @@index([targetType, targetId])
   @@map("file_objects")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Team Chat + Integrations — org channels of messages. The integration angle:
+// the same domain events that drive the rest of the platform are posted as
+// SYSTEM messages into an "activity" channel, so a deploy or an incident shows
+// up in chat automatically. The event bus flows into the conversation.
+// ─────────────────────────────────────────────────────────────
+
+model Channel {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  topic          String?
+  /// The auto-fed activity channel (system events land here).
+  isSystem       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("channels")
+}
+
+model ChatMessage {
+  id        String          @id @default(cuid())
+  channelId String
+  authorId  String?
+  kind      ChatMessageKind @default(USER)
+  body      String
+  createdAt DateTime        @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author  User?   @relation("ChatAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([channelId, createdAt])
+  @@map("chat_messages")
 }
 
 // ─────────────────────────────────────────────────────────────

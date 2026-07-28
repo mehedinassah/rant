@@ -70,6 +70,12 @@ export default function OrgPage() {
         </Link>
         <div className="flex items-center gap-3">
           <Link
+            href={`/orgs/${orgId}/chat`}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+          >
+            💬 Chat
+          </Link>
+          <Link
             href={`/orgs/${orgId}/copilot`}
             className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >

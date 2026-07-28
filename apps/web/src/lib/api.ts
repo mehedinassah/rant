@@ -1244,6 +1244,78 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ── team chat ───────────────────────────────────────────────
+
+export interface Channel {
+  id: string;
+  name: string;
+  topic?: string | null;
+  isSystem: boolean;
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  kind: 'USER' | 'SYSTEM';
+  body: string;
+  createdAt: string;
+  author?: UserRef | null;
+}
+
+export const chat = {
+  channels: (orgId: string) => api<Channel[]>(`/organizations/${orgId}/channels`),
+  createChannel: (orgId: string, data: { name: string; topic?: string }) =>
+    api<Channel>(`/organizations/${orgId}/channels`, { method: 'POST', body: JSON.stringify(data) }),
+  messages: (orgId: string, channelId: string) =>
+    api<ChatMessage[]>(`/organizations/${orgId}/channels/${channelId}/messages`),
+  post: (orgId: string, channelId: string, body: string) =>
+    api<ChatMessage>(`/organizations/${orgId}/channels/${channelId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+};
+
+/** Subscribes to a channel's live message stream (fetch-based SSE, JWT-aware). */
+export function streamChannel(
+  orgId: string,
+  channelId: string,
+  onUpdate: (messages: ChatMessage[]) => void,
+): () => void {
+  const controller = new AbortController();
+  const token = getAccessToken();
+  (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/organizations/${orgId}/channels/${channelId}/stream`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        signal: controller.signal,
+      });
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          try {
+            onUpdate((JSON.parse(line.slice(5).trim()) as { messages: ChatMessage[] }).messages);
+          } catch {
+            /* ignore partial frames */
+          }
+        }
+      }
+    } catch {
+      /* aborted or closed — expected */
+    }
+  })();
+  return () => controller.abort();
+}
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
