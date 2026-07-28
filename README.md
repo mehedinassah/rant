@@ -20,12 +20,12 @@ system.
 > repos, PRs, docs and incidents), an API Platform (programmatic API keys ·
 > OpenAPI docs · outbound webhooks), an Analytics dashboard (deploy
 > frequency · CI pass rate · MTTR · issue throughput across every module),
-> Billing (plans · subscriptions · invoices · plan-gated limits), and a grounded
+> Billing (plans · subscriptions · invoices · plan-gated limits), a grounded
 > AI Copilot (a chat assistant that answers from your live data and cites the
-> records) — all implemented end-to-end with RBAC + audit logging, and with
-> frontends for the board, repos, CI runs, deployments, monitoring,
-> notifications, docs, search, API settings, analytics, billing and copilot.
-> This is where the
+> records), and Files (real multipart upload/download, attachable to any entity)
+> — all implemented end-to-end with RBAC + audit logging, and with frontends for
+> the board, repos, CI runs, deployments, monitoring, notifications, docs,
+> search, API settings, analytics, billing, copilot and files. This is where the
 > platform *connects*: a commit triggers a CI
 > run, a green run gates the PR merge **and** auto-deploys (production on the
 > default branch, a preview URL per pull request), the live URL is then
@@ -247,6 +247,13 @@ across every module: totals, issue throughput + status mix, deployment frequency
 most-deployed repos). No new storage — it aggregates the data the other modules
 already produce.
 
+**Files** — `POST .../files` (multipart upload, field `file`, optional
+`targetType`/`targetId` to attach) · `GET .../files` (list, filterable by
+target) · `GET .../files/:fileId` · `GET .../files/:fileId/download` (streams the
+bytes with the right content-type) · `DELETE .../files/:fileId`. There's no real
+S3 — bytes live in the database (5 MB cap) behind a synthetic CDN URL — but
+uploads and downloads genuinely round-trip, and a file can attach to any entity.
+
 **Copilot** — `POST .../copilot/ask` (message + optional conversationId) ·
 `GET .../copilot/conversations` · `GET|DELETE .../copilot/conversations/:id` ·
 `GET .../copilot/suggestions`. A **grounded** assistant: it classifies intent
@@ -285,4 +292,4 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-Audit UI · Files · Team Chat · Integrations.
+Audit UI · Team Chat · Integrations.

@@ -265,6 +265,7 @@ model User {
   savedSearches           SavedSearch[]
   apiKeys                 ApiKey[]
   copilotChats            CopilotConversation[]
+  uploadedFiles           FileObject[]  @relation("FileUploader")
 
   @@map("users")
 }
@@ -310,6 +311,7 @@ model Organization {
   subscription     Subscription?
   invoices         Invoice[]
   copilotChats     CopilotConversation[]
+  files            FileObject[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -1104,6 +1106,37 @@ model CopilotMessage {
 
   @@index([conversationId, createdAt])
   @@map("copilot_messages")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Files — object storage for attachments. There's no real S3 here, so bytes
+// live in the database (capped small) and a synthetic CDN URL is generated —
+// but uploads and downloads genuinely round-trip. A file can optionally attach
+// to any entity via (targetType, targetId).
+// ─────────────────────────────────────────────────────────────
+
+model FileObject {
+  id             String   @id @default(cuid())
+  organizationId String
+  uploaderId     String
+  name           String
+  mimeType       String
+  sizeBytes      Int
+  /// Synthetic storage key + public-looking URL (no real CDN).
+  storageKey     String
+  url            String
+  /// The bytes themselves (demo-scale; real builds would stream to S3/R2).
+  content        Bytes
+  targetType     String?
+  targetId       String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploader     User         @relation("FileUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([targetType, targetId])
+  @@map("file_objects")
 }
 
 // ─────────────────────────────────────────────────────────────

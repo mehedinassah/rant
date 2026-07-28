@@ -1164,6 +1164,86 @@ export const copilot = {
     }),
 };
 
+// ── files ───────────────────────────────────────────────────
+
+export interface FileObject {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageKey: string;
+  url: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  createdAt: string;
+  uploader?: UserRef | null;
+}
+
+export const files = {
+  list: (orgId: string, target?: { targetType?: string; targetId?: string }) => {
+    const q = new URLSearchParams();
+    if (target?.targetType) q.set('targetType', target.targetType);
+    if (target?.targetId) q.set('targetId', target.targetId);
+    const qs = q.toString();
+    return api<FileObject[]>(`/organizations/${orgId}/files${qs ? `?${qs}` : ''}`);
+  },
+  remove: (orgId: string, fileId: string) =>
+    api<{ success: boolean }>(`/organizations/${orgId}/files/${fileId}`, { method: 'DELETE' }),
+};
+
+/** Multipart upload — bypasses the JSON api() wrapper so the browser sets the boundary. */
+export async function uploadFile(
+  orgId: string,
+  file: File,
+  target?: { targetType?: string; targetId?: string },
+): Promise<FileObject> {
+  const token = getAccessToken();
+  const form = new FormData();
+  form.append('file', file);
+  if (target?.targetType) form.append('targetType', target.targetType);
+  if (target?.targetId) form.append('targetId', target.targetId);
+  const res = await fetch(`${API_BASE}/organizations/${orgId}/files`, {
+    method: 'POST',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!res.ok) {
+    let message = `Upload failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: string | string[] };
+      if (body.message) message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as FileObject;
+}
+
+/** Authenticated download — fetches the blob (JWT header) and saves it. */
+export async function downloadFile(orgId: string, fileId: string, name: string): Promise<void> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE}/organizations/${orgId}/files/${fileId}/download`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
