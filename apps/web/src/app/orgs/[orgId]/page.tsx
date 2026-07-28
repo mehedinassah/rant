@@ -64,11 +64,11 @@ export default function OrgPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <div className="flex items-start justify-between">
-        <Link href="/dashboard" className="text-sm text-white/50 hover:text-white">
+      <div className="flex items-start justify-between gap-4">
+        <Link href="/dashboard" className="shrink-0 text-sm text-white/50 hover:text-white">
           ← All organizations
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             href={`/orgs/${orgId}/chat`}
             className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
@@ -110,6 +110,12 @@ export default function OrgPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             📎 Files
+          </Link>
+          <Link
+            href={`/orgs/${orgId}/audit`}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+          >
+            🧾 Audit
           </Link>
           <NotificationBell />
         </div>

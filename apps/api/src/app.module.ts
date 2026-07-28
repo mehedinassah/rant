@@ -29,6 +29,7 @@ import { BillingModule } from './modules/billing/billing.module';
 import { CopilotModule } from './modules/copilot/copilot.module';
 import { FilesModule } from './modules/files/files.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { AuditViewModule } from './modules/audit/audit.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -80,6 +81,7 @@ import { HealthController } from './health.controller';
     CopilotModule,
     FilesModule,
     ChatModule,
+    AuditViewModule,
   ],
   controllers: [HealthController],
   providers: [

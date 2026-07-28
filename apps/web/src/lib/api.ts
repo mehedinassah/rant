@@ -1316,6 +1316,38 @@ export function streamChannel(
   return () => controller.abort();
 }
 
+// ── audit log ───────────────────────────────────────────────
+
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  ip?: string | null;
+  createdAt: string;
+  actor?: UserRef | null;
+}
+
+export const audit = {
+  logs: (orgId: string, params: { page?: number; pageSize?: number; action?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.page) q.set('page', String(params.page));
+    if (params.pageSize) q.set('pageSize', String(params.pageSize));
+    if (params.action) q.set('action', params.action);
+    const qs = q.toString();
+    return api<Paginated<AuditLog>>(`/organizations/${orgId}/audit-logs${qs ? `?${qs}` : ''}`);
+  },
+};
+
 // ── small shared display helpers ────────────────────────────
 
 export const ISSUE_COLUMNS: { status: IssueStatus; label: string }[] = [
