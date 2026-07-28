@@ -10,6 +10,8 @@ import { GithubProcessor } from './github.processor';
 import { GithubApiClient } from './github-api.client';
 import { GithubSyncService } from './github-sync.service';
 import { GithubSyncProcessor } from './github-sync.processor';
+import { GithubConnectService } from './github-connect.service';
+import { GithubConnectController } from './github-connect.controller';
 import { GITHUB_EVENTS_QUEUE, GITHUB_SYNC_QUEUE } from './github.constants';
 
 /**
@@ -22,7 +24,7 @@ import { GITHUB_EVENTS_QUEUE, GITHUB_SYNC_QUEUE } from './github.constants';
   imports: [
     BullModule.registerQueue({ name: GITHUB_EVENTS_QUEUE }, { name: GITHUB_SYNC_QUEUE }),
   ],
-  controllers: [GithubWebhookController],
+  controllers: [GithubWebhookController, GithubConnectController],
   providers: [
     GithubConfig,
     GithubAuthService,
@@ -33,6 +35,7 @@ import { GITHUB_EVENTS_QUEUE, GITHUB_SYNC_QUEUE } from './github.constants';
     GithubApiClient,
     GithubSyncService,
     GithubSyncProcessor,
+    GithubConnectService,
   ],
   exports: [GithubConfig, GithubAuthService, GithubIngestService, GithubUserMapper, GithubSyncService],
 })

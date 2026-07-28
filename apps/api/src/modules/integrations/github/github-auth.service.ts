@@ -135,6 +135,25 @@ export class GithubAuthService {
     return { githubId: user.id, login: user.login, avatarUrl: user.avatar_url ?? null };
   }
 
+  /** Looks up installation metadata (account login) using the App JWT. */
+  async getInstallationMeta(
+    installationId: string | number,
+  ): Promise<{ accountLogin: string }> {
+    const res = await fetch(`${GITHUB_API_BASE}/app/installations/${installationId}`, {
+      headers: {
+        Authorization: `Bearer ${this.appJwt()}`,
+        Accept: GITHUB_ACCEPT,
+        'X-GitHub-Api-Version': GITHUB_API_VERSION,
+        'User-Agent': GITHUB_USER_AGENT,
+      },
+    });
+    if (!res.ok) {
+      throw new ServiceUnavailableException(`GitHub installation lookup failed: ${res.status}`);
+    }
+    const data = (await res.json()) as { account?: { login?: string } };
+    return { accountLogin: data.account?.login ?? 'unknown' };
+  }
+
   /** Test/util hook: drop cached tokens (e.g. on uninstall). */
   clearTokenCache(installationId?: string | number): void {
     if (installationId === undefined) this.tokenCache.clear();
