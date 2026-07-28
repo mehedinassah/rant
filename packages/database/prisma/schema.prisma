@@ -98,6 +98,14 @@ enum RepositoryVisibility {
   PUBLIC
 }
 
+/// Provenance of a code record: created inside rant vs synced from an external
+/// provider (GitHub). GITHUB records are read-only in rant; the provider is the
+/// system of record.
+enum RecordSource {
+  NATIVE
+  GITHUB
+}
+
 enum PullRequestStatus {
   DRAFT
   OPEN
@@ -281,6 +289,7 @@ model User {
   uploadedFiles           FileObject[]  @relation("FileUploader")
   chatMessages            ChatMessage[] @relation("ChatAuthor")
   sentInvitations         Invitation[]  @relation("InvitationInviter")
+  githubAccountLink       GithubAccountLink?
 
   @@map("users")
 }
@@ -329,6 +338,7 @@ model Organization {
   copilotChats     CopilotConversation[]
   files            FileObject[]
   channels         Channel[]
+  githubInstallation GithubInstallation?
 
   @@index([ownerId])
   @@map("organizations")
@@ -534,6 +544,9 @@ model Repository {
   defaultBranch      String               @default("main")
   /// Monotonic counter used to mint PR numbers (#1, #2, ...).
   pullRequestCounter Int                  @default(0)
+  source             RecordSource         @default(NATIVE)
+  /// Provider id (e.g. GitHub repo id), stable across renames. Null for NATIVE.
+  externalId         String?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -548,6 +561,7 @@ model Repository {
   environments Environment[]
 
   @@unique([organizationId, slug])
+  @@unique([organizationId, externalId])
   @@index([organizationId])
   @@map("repositories")
 }
@@ -576,12 +590,15 @@ model Commit {
   branch       String
   parentSha    String?
   authorId     String
+  source       RecordSource @default(NATIVE)
+  externalId   String?
   createdAt    DateTime @default(now())
 
   repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   author     User       @relation("CommitAuthor", fields: [authorId], references: [id])
 
   @@unique([repositoryId, sha])
+  @@unique([repositoryId, externalId])
   @@index([repositoryId, branch])
   @@map("commits")
 }
@@ -632,6 +649,8 @@ model PullRequest {
   mergeCommitSha String?
   mergedAt       DateTime?
   mergeQueuedAt  DateTime?
+  source         RecordSource      @default(NATIVE)
+  externalId     String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -643,6 +662,7 @@ model PullRequest {
   deployments  Deployment[]
 
   @@unique([repositoryId, number])
+  @@unique([repositoryId, externalId])
   @@index([repositoryId, status])
   @@map("pull_requests")
 }
@@ -653,13 +673,63 @@ model Review {
   reviewerId    String
   state         ReviewState
   body          String?
+  source        RecordSource @default(NATIVE)
+  externalId    String?
   createdAt     DateTime    @default(now())
 
   pullRequest PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
   reviewer    User        @relation("ReviewAuthor", fields: [reviewerId], references: [id])
 
+  @@unique([pullRequestId, externalId])
   @@index([pullRequestId])
   @@map("reviews")
+}
+
+// ─────────────────────────────────────────────────────────────
+// GitHub integration — installation, user linking, webhook ledger.
+// A GitHub App is installed per org (webhooks + installation tokens); user
+// OAuth links a GitHub identity to a rant user so authorship maps correctly.
+// ─────────────────────────────────────────────────────────────
+
+model GithubInstallation {
+  id             String    @id @default(cuid())
+  organizationId String    @unique
+  /// GitHub's numeric installation id (used to mint installation tokens).
+  installationId BigInt    @unique
+  /// The org/user login the app is installed on.
+  accountLogin   String
+  suspendedAt    DateTime?
+  syncedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("github_installations")
+}
+
+model GithubAccountLink {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  githubId  BigInt   @unique
+  login     String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("github_account_links")
+}
+
+/// Idempotency ledger: every webhook delivery id is recorded once so redelivered
+/// events are ignored.
+model GithubWebhookDelivery {
+  id         String   @id @default(cuid())
+  deliveryId String   @unique
+  event      String
+  receivedAt DateTime @default(now())
+
+  @@map("github_webhook_deliveries")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -704,6 +774,8 @@ model PipelineRun {
   commitSha     String?
   pullRequestId String?
   triggeredById String?
+  source        RecordSource    @default(NATIVE)
+  externalId    String?
   startedAt     DateTime?
   finishedAt    DateTime?
   createdAt     DateTime        @default(now())
@@ -714,6 +786,7 @@ model PipelineRun {
   jobs        PipelineJob[]
 
   @@unique([pipelineId, number])
+  @@unique([pipelineId, externalId])
   @@index([pipelineId, status])
   @@index([pullRequestId])
   @@map("pipeline_runs")
