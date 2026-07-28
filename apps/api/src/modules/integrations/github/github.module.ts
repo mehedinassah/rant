@@ -7,16 +7,21 @@ import { GithubWebhookController } from './github-webhook.controller';
 import { GithubUserMapper } from './github-user.mapper';
 import { GithubIngestService } from './github-ingest.service';
 import { GithubProcessor } from './github.processor';
-import { GITHUB_EVENTS_QUEUE } from './github.constants';
+import { GithubApiClient } from './github-api.client';
+import { GithubSyncService } from './github-sync.service';
+import { GithubSyncProcessor } from './github-sync.processor';
+import { GITHUB_EVENTS_QUEUE, GITHUB_SYNC_QUEUE } from './github.constants';
 
 /**
  * GitHub integration. Grows across tickets G2–G10. Today: config + App/OAuth
- * auth (G2), webhook ingestion (G3), and the event processor + mappers (G4)
- * that map real GitHub events onto rant models and re-emit the domain events so
- * the ripple fires. Sync (G5) and the connect flow (G6) attach here next.
+ * auth (G2), webhook ingestion (G3), the event processor + mappers (G4) that
+ * re-emit domain events so the ripple fires, and backfill sync (G5). The
+ * connect flow (G6) attaches here next.
  */
 @Module({
-  imports: [BullModule.registerQueue({ name: GITHUB_EVENTS_QUEUE })],
+  imports: [
+    BullModule.registerQueue({ name: GITHUB_EVENTS_QUEUE }, { name: GITHUB_SYNC_QUEUE }),
+  ],
   controllers: [GithubWebhookController],
   providers: [
     GithubConfig,
@@ -25,7 +30,10 @@ import { GITHUB_EVENTS_QUEUE } from './github.constants';
     GithubUserMapper,
     GithubIngestService,
     GithubProcessor,
+    GithubApiClient,
+    GithubSyncService,
+    GithubSyncProcessor,
   ],
-  exports: [GithubConfig, GithubAuthService, GithubIngestService, GithubUserMapper],
+  exports: [GithubConfig, GithubAuthService, GithubIngestService, GithubUserMapper, GithubSyncService],
 })
 export class GithubModule {}
