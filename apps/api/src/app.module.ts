@@ -32,6 +32,7 @@ import { CopilotModule } from './modules/copilot/copilot.module';
 import { FilesModule } from './modules/files/files.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AuditViewModule } from './modules/audit/audit.module';
+import { GithubModule } from './modules/integrations/github/github.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -86,6 +87,7 @@ import { HealthController } from './health.controller';
     FilesModule,
     ChatModule,
     AuditViewModule,
+    GithubModule,
   ],
   controllers: [HealthController],
   providers: [
