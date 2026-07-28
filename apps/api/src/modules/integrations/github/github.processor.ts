@@ -35,7 +35,9 @@ export class GithubProcessor extends WorkerHost {
   }
 
   async process(job: Job<GithubJobData>): Promise<void> {
-    const { event, payload } = job.data;
+    const { event, deliveryId, payload } = job.data;
+    const repo = (payload as Payload)?.repository?.full_name ?? 'unknown';
+    this.logger.log(`event=${event} repo=${repo} delivery=${deliveryId}`);
     switch (event) {
       case 'push':
         return this.onPush(payload);

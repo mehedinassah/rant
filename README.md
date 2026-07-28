@@ -162,6 +162,17 @@ Base URL: `/api/v1`
 invitee's sign-up; accepting is gated on the plan's seat limit and matched to
 the invited email address.
 
+**GitHub integration** — `POST /integrations/github/webhook` (public, HMAC-signed) ·
+`GET|POST|DELETE /organizations/:orgId/integrations/github[/…]` (install-url,
+complete-install, status, resync, disconnect — ADMIN) ·
+`GET|POST|DELETE /integrations/github/account` (link your GitHub identity). A
+GitHub App is installed per org; verified webhooks are deduped and enqueued, then
+a worker maps real pushes, PRs, reviews and Actions runs onto rant's models and
+**re-emits the existing domain events** — so a real failed CI run opens an
+incident, posts to `#activity` and notifies the team through the same ripple as
+the simulated modules. See [`docs/github-integration.md`](docs/github-integration.md).
+Disabled until a GitHub App is configured (`FEATURE_GITHUB` / `GITHUB_*` env).
+
 **Workspaces** — `GET|POST /organizations/:orgId/workspaces` ·
 `GET|PATCH|DELETE /organizations/:orgId/workspaces/:workspaceId`
 
@@ -327,13 +338,18 @@ per-route via `@Roles(...)`.
 
 All 18 modules from the system design are implemented, plus a hardening pass:
 **security headers + rate limiting**, an **Audit UI** with **pagination**, a
-**unit test suite wired into GitHub Actions CI**, and a **token-based
-member-invite flow** (email-first invitations with an accept page and a
-pluggable mail stub).
+**unit test suite wired into GitHub Actions CI**, a **token-based member-invite
+flow** (email-first invitations with an accept page and a pluggable mail stub),
+and a **real GitHub integration** — the first module whose data is genuinely
+external. A GitHub App syncs repos/commits/PRs/Actions runs and re-emits rant's
+domain events, so a real failed CI run ripples into incidents, chat and
+notifications exactly like the simulated modules
+([spec](docs/github-integration.md)).
 
 What remains is deeper production-hardening rather than new surface area:
-swapping the simulated workers for real runners/hosts (containers, a real host,
-a git backend), broader test coverage (integration + e2e), wiring the mail stub
-to a real provider (Resend/SES), object storage (S3/R2) in place of in-database
-bytes, WebSockets for richer real-time, and OpenTelemetry for observing rant
-itself.
+swapping the remaining simulated workers for real runners/hosts (containers, a
+real host), broadening the real-integration pattern to deploys/monitoring
+(Vercel/Sentry — same webhook-ingestion shape as GitHub), broader test coverage
+(integration + e2e), wiring the mail stub to a real provider (Resend/SES),
+object storage (S3/R2) in place of in-database bytes, WebSockets for richer
+real-time, and OpenTelemetry for observing rant itself.

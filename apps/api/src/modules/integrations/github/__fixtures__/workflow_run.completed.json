@@ -1,0 +1,25 @@
+{
+  "action": "completed",
+  "installation": { "id": 55555 },
+  "repository": {
+    "id": 987654,
+    "name": "rocket-api",
+    "full_name": "acme/rocket-api",
+    "private": true,
+    "default_branch": "main",
+    "owner": { "login": "acme" }
+  },
+  "workflow_run": {
+    "id": 111222333,
+    "name": "CI",
+    "run_number": 42,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "failure",
+    "head_branch": "main",
+    "head_sha": "d34db33fcafebabe0000000000000000deadbeef",
+    "actor": { "id": 4242, "login": "octodev", "avatar_url": "https://avatars.example/u/4242" },
+    "run_started_at": "2026-07-28T10:00:00Z",
+    "updated_at": "2026-07-28T10:03:12Z"
+  }
+}
