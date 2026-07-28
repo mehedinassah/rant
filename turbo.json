@@ -15,6 +15,9 @@
     "typecheck": {
       "dependsOn": ["^build", "db:generate"]
     },
+    "test": {
+      "dependsOn": ["db:generate"]
+    },
     "db:generate": {
       "cache": false
     }

@@ -22,9 +22,9 @@ export interface CopilotReply {
 type Intent = 'health' | 'shipped' | 'mywork' | 'summary' | 'help';
 
 const INTENT_PATTERNS: { intent: Intent; re: RegExp }[] = [
-  { intent: 'health', re: /\b(broke|broken|down|incident|outage|failing|failed|fire|alert|wrong|health|status)\b/i },
+  { intent: 'health', re: /\b(broke|broken|down|incidents?|outages?|failing|failed|fire|alerts?|wrong|health|status)\b/i },
   { intent: 'shipped', re: /\b(ship|shipped|deploy|deployed|release|released|merged|recent|activity|this week|happened)\b/i },
-  { intent: 'mywork', re: /\b(my (work|task|issue|todo)|assigned to me|what should i|work on|what.?s next|my plate)\b/i },
+  { intent: 'mywork', re: /\b(my (work|tasks?|issues?|todos?)|assigned to me|what should i|work on|what.?s next|my plate)\b/i },
   { intent: 'summary', re: /\b(summary|summarise|summarize|overview|how are we|report|standup|stand-up|digest|doing)\b/i },
   { intent: 'help', re: /\b(help|what can you|capabilit|who are you|how do you work)\b/i },
 ];

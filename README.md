@@ -1,5 +1,7 @@
 # rant
 
+[![CI](https://github.com/mehedinassah/rant/actions/workflows/ci.yml/badge.svg)](https://github.com/mehedinassah/rant/actions/workflows/ci.yml)
+
 **The operating system for modern software teams.**
 
 A unified platform where companies plan, develop, deploy, monitor, and maintain
@@ -121,10 +123,24 @@ pnpm dev
 | `pnpm dev`          | Run all apps in watch mode (Turborepo)       |
 | `pnpm build`        | Build every package/app                      |
 | `pnpm typecheck`    | Typecheck the whole repo                     |
+| `pnpm test`         | Run the unit test suite                      |
 | `pnpm db:push`      | Push Prisma schema to the database           |
 | `pnpm db:migrate`   | Create + apply a migration                   |
 | `pnpm db:seed`      | Seed demo data                               |
 | `pnpm db:studio`    | Open Prisma Studio                           |
+
+## Testing & CI
+
+The API ships a Jest unit suite for its pure logic (`pnpm test`) — API-key
+hashing, pagination clamping, the CI/deploy simulation predicates, and the
+copilot's intent classifier. A **GitHub Actions** workflow
+(`.github/workflows/ci.yml`) runs `install → prisma generate → typecheck → test →
+build` on every push and pull request. Each module was additionally verified
+end-to-end during development with throwaway smoke scripts against a live server.
+
+The API is hardened with **helmet** (security headers) and **rate limiting**
+(`@nestjs/throttler`: 120 req/min per IP, 10/min on auth), and list endpoints
+that can grow (the audit log) are **paginated**.
 
 ## API surface
 
@@ -301,10 +317,12 @@ per-route via `@Roles(...)`.
 
 ## Roadmap
 
-All 18 modules from the system design are implemented. What remains is
-production-hardening rather than new surface area: swapping the simulated
-workers for real runners/hosts (containers, a real host, a git backend), a
-committed automated test suite, member-invite emails (via a real provider),
-pagination + rate limiting, an Audit UI over the `audit_logs` already being
-written, object storage (S3/R2) in place of in-database bytes, WebSockets for
-richer real-time, and OpenTelemetry for observing rant itself.
+All 18 modules from the system design are implemented, plus a first hardening
+pass: **security headers + rate limiting**, an **Audit UI** with **pagination**,
+and a **unit test suite wired into GitHub Actions CI**.
+
+What remains is deeper production-hardening rather than new surface area:
+swapping the simulated workers for real runners/hosts (containers, a real host,
+a git backend), broader test coverage (integration + e2e), member-invite emails
+via a real provider, object storage (S3/R2) in place of in-database bytes,
+WebSockets for richer real-time, and OpenTelemetry for observing rant itself.
