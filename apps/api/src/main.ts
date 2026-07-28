@@ -8,7 +8,9 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  // rawBody lets the GitHub webhook controller read the exact bytes GitHub
+  // signed, so HMAC verification matches (JSON re-serialization would differ).
+  const app = await NestFactory.create(AppModule, { cors: true, rawBody: true });
   const config = app.get(ConfigService);
 
   // Security headers. CSP is disabled (this is a JSON API + Swagger UI, not an
