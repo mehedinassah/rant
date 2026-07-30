@@ -73,7 +73,13 @@ export default function BillingPage() {
     setBusy(true);
     setError(null);
     try {
-      await billingApi.changePlan(orgId, plan);
+      // Goes through checkout: Stripe returns a redirect URL; simulated mode
+      // applies immediately and returns a local success URL.
+      const { url, applied } = await billingApi.checkout(orgId, plan);
+      if (!applied && url) {
+        window.location.href = url; // hand off to Stripe Checkout
+        return;
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to change plan');

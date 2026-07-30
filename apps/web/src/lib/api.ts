@@ -1233,6 +1233,11 @@ export const billing = {
       method: 'POST',
       body: JSON.stringify({ plan }),
     }),
+  checkout: (orgId: string, plan: PlanTier) =>
+    api<{ url: string; applied: boolean }>(`${billingBase(orgId)}/checkout`, {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
+    }),
   cancel: (orgId: string) =>
     api<Subscription>(`${billingBase(orgId)}/subscription/cancel`, { method: 'POST' }),
   resume: (orgId: string) =>

@@ -40,6 +40,18 @@ export class BillingController {
     return this.billing.changePlan(orgId, userId, dto.plan);
   }
 
+  /** Starts an upgrade: returns a URL to redirect to (Stripe Checkout, or a
+   * local success page in simulated mode where the change already applied). */
+  @Roles(OrgRole.ADMIN)
+  @Post('checkout')
+  checkout(
+    @Param('orgId') orgId: string,
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ChangePlanDto,
+  ) {
+    return this.billing.startCheckout(orgId, userId, dto.plan);
+  }
+
   @Roles(OrgRole.ADMIN)
   @Post('subscription/cancel')
   cancel(@Param('orgId') orgId: string, @CurrentUser('userId') userId: string) {
