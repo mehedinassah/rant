@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.log
+.git
+.github
+.env
+.env.*
+!.env.example
+on-call-handbook
+se-trainee-prep
+tmp-*.mjs
+**/*.md

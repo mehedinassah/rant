@@ -116,6 +116,24 @@ pnpm dev
 - API docs (OpenAPI/Swagger) → http://localhost:4000/docs
 - Web → http://localhost:3000
 
+### Run the whole stack in Docker
+
+Both apps are containerized (multi-stage builds; the web image uses Next.js
+standalone output; the API image applies migrations on boot). The app services
+live behind a compose **profile** so the default `up` stays dev-only:
+
+```bash
+# just the datastores (for local `pnpm dev`)
+docker compose up -d
+
+# the full stack — postgres + redis + api + web
+docker compose --profile app up -d --build
+# → web http://localhost:3000 · api http://localhost:4000
+```
+
+The API container runs `prisma migrate deploy` before starting, so a fresh
+database is provisioned automatically.
+
 ## Useful scripts
 
 | Command             | Description                                  |
