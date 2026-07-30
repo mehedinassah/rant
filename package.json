@@ -17,6 +17,8 @@
     "db:generate": "pnpm --filter @rant/database run generate",
     "db:push": "pnpm --filter @rant/database run push",
     "db:migrate": "pnpm --filter @rant/database run migrate",
+    "db:migrate:deploy": "pnpm --filter @rant/database run migrate:deploy",
+    "db:migrate:baseline": "pnpm --filter @rant/database run migrate:baseline",
     "db:seed": "pnpm --filter @rant/database run seed",
     "db:studio": "pnpm --filter @rant/database run studio"
   },

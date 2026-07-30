@@ -105,7 +105,7 @@ cp .env.example .env      # then edit secrets if you like
 
 # 3. database (needs Postgres running)
 docker compose up -d      # starts postgres + redis
-pnpm db:push              # sync schema
+pnpm db:migrate:deploy    # apply migrations (canonical)
 pnpm db:seed              # demo org/workspace/project
 
 # 4. run everything (api + web + db watcher)
@@ -124,10 +124,23 @@ pnpm dev
 | `pnpm build`        | Build every package/app                      |
 | `pnpm typecheck`    | Typecheck the whole repo                     |
 | `pnpm test`         | Run the unit test suite                      |
-| `pnpm db:push`      | Push Prisma schema to the database           |
-| `pnpm db:migrate`   | Create + apply a migration                   |
+| `pnpm db:migrate`   | Create + apply a new migration (dev)         |
+| `pnpm db:migrate:deploy` | Apply pending migrations (prod/CI)      |
+| `pnpm db:push`      | Fast schema sync, no migration (prototyping) |
 | `pnpm db:seed`      | Seed demo data                               |
 | `pnpm db:studio`    | Open Prisma Studio                           |
+
+### Database migrations
+
+Schema changes are tracked as versioned SQL migrations under
+`packages/database/prisma/migrations/` — `prisma migrate deploy` applies them
+deterministically in every environment (this is what CI/prod use). `db:push`
+remains available for quick local prototyping, but committed schema changes
+should ship as a migration (`pnpm db:migrate --name <change>`).
+
+> **Existing dev database?** If your local DB was created with `db:push` before
+> migrations existed, baseline it once so Prisma knows the initial migration is
+> already applied: `pnpm db:migrate:baseline`. Fresh databases skip this.
 
 ## Testing & CI
 

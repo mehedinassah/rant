@@ -16,6 +16,9 @@
     "dev": "prisma generate && tsc -p tsconfig.json --watch --preserveWatchOutput",
     "push": "dotenv -e ../../.env -- prisma db push",
     "migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "migrate:status": "dotenv -e ../../.env -- prisma migrate status",
+    "migrate:baseline": "dotenv -e ../../.env -- prisma migrate resolve --applied 20260101000000_init",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts"
   },
