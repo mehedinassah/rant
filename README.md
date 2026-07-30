@@ -378,10 +378,20 @@ domain events, so a real failed CI run ripples into incidents, chat and
 notifications exactly like the simulated modules
 ([spec](docs/github-integration.md)).
 
-What remains is deeper production-hardening rather than new surface area:
-swapping the remaining simulated workers for real runners/hosts (containers, a
-real host), broadening the real-integration pattern to deploys/monitoring
-(Vercel/Sentry — same webhook-ingestion shape as GitHub), broader test coverage
-(integration + e2e), wiring the mail stub to a real provider (Resend/SES),
-object storage (S3/R2) in place of in-database bytes, WebSockets for richer
-real-time, and OpenTelemetry for observing rant itself.
+On top of that, a **production-plumbing pass** makes the platform deployable and
+extensible without code changes:
+- **Prisma migrations** as the source of truth (`migrate deploy`), replacing
+  `db push`.
+- **Dockerized** API + web (multi-stage; Next.js standalone; the API
+  self-migrates on boot) with a `docker compose --profile app` full stack.
+- **Liveness/readiness probes** (`/health`, `/health/ready`) + a structured
+  request log.
+- **Provider abstractions** so real backends drop in behind an env var, keeping
+  the zero-config default: **email** (console → Resend), **object storage**
+  (Postgres blobs → S3/R2 with presigned URLs), and **billing** (simulated →
+  real Stripe Checkout + webhooks).
+
+What remains is mostly external-service wiring and depth: broadening the
+real-integration pattern to deploys/monitoring (Vercel/Sentry — same
+webhook-ingestion shape as GitHub), integration + e2e test coverage, WebSockets
+for richer real-time, and OpenTelemetry for observing rant itself.
