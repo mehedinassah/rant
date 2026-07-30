@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -34,6 +34,8 @@ import { ChatModule } from './modules/chat/chat.module';
 import { AuditViewModule } from './modules/audit/audit.module';
 import { GithubModule } from './modules/integrations/github/github.module';
 import { HealthController } from './health.controller';
+import { HealthService } from './health.service';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
   imports: [
@@ -91,6 +93,9 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
   providers: [
+    HealthService,
+    // Structured access log for every request.
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
     // Rate limiting runs first, before any auth work.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // JWT auth is on by default; opt out per-route with @Public().

@@ -1,25 +1,40 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { Public } from './common/decorators/public.decorator';
-import { PrismaService } from './common/prisma/prisma.service';
+import { HealthService } from './health.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly health: HealthService) {}
 
+  /**
+   * Liveness: is the process up and serving? No dependency checks — a failing
+   * dependency should NOT restart the container (that's what readiness is for).
+   */
   @Public()
   @Get()
-  async check() {
-    let db = 'up';
-    try {
-      await this.prisma.$queryRaw`SELECT 1`;
-    } catch {
-      db = 'down';
-    }
-    return {
-      status: db === 'up' ? 'ok' : 'degraded',
-      service: 'rant-api',
-      db,
+  live() {
+    return { status: 'ok', service: 'rant-api', timestamp: new Date().toISOString() };
+  }
+
+  /**
+   * Readiness: can we serve traffic? Checks Postgres + Redis. Returns 503 (via
+   * ServiceUnavailableException) when a dependency is down so orchestrators/load
+   * balancers hold traffic until we recover.
+   */
+  @Public()
+  @Get('ready')
+  async ready() {
+    const [db, redis] = await Promise.all([
+      this.health.checkDatabase(),
+      this.health.checkRedis(),
+    ]);
+    const ready = db.up && redis.up;
+    const body = {
+      status: ready ? 'ready' : 'not_ready',
+      checks: { database: db, redis },
       timestamp: new Date().toISOString(),
     };
+    if (!ready) throw new ServiceUnavailableException(body);
+    return body;
   }
 }
