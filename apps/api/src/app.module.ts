@@ -8,6 +8,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuditModule } from './common/audit/audit.module';
 import { MailModule } from './common/mail/mail.module';
+import { StorageModule } from './common/storage/storage.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
@@ -67,6 +68,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     PrismaModule,
     AuditModule,
     MailModule,
+    StorageModule,
     AuthModule,
     OrganizationsModule,
     InvitationsModule,

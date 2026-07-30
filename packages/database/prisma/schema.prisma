@@ -1235,11 +1235,14 @@ model FileObject {
   name           String
   mimeType       String
   sizeBytes      Int
-  /// Synthetic storage key + public-looking URL (no real CDN).
+  /// Storage key + URL. For db storage the bytes live in StorageBlob; for s3
+  /// they live in the bucket under storageKey and url is a (signed) object URL.
   storageKey     String
   url            String
-  /// The bytes themselves (demo-scale; real builds would stream to S3/R2).
-  content        Bytes
+  /// Which StorageProvider holds the bytes ("db" | "s3").
+  storageProvider String @default("db")
+  /// Legacy inline bytes (pre-StorageBlob rows). New uploads leave this null.
+  content        Bytes?
   targetType     String?
   targetId       String?
   createdAt      DateTime @default(now())
@@ -1250,6 +1253,18 @@ model FileObject {
   @@index([organizationId, createdAt])
   @@index([targetType, targetId])
   @@map("file_objects")
+}
+
+/// DB-backed blob store (default StorageProvider). Decoupled from FileObject so
+/// storage can be swapped for S3/R2 without touching the file metadata model.
+model StorageBlob {
+  key         String   @id
+  content     Bytes
+  contentType String?
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  @@map("storage_blobs")
 }
 
 // ─────────────────────────────────────────────────────────────

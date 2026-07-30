@@ -54,8 +54,13 @@ export class FilesController {
     @Param('fileId') fileId: string,
     @Res() res: Response,
   ) {
-    const file = await this.files.getContent(orgId, fileId);
-    const buf = Buffer.from(file.content);
+    const file = await this.files.getDownload(orgId, fileId);
+    if (file.redirectUrl) {
+      // S3/R2: hand the client a presigned URL; bytes never proxy through us.
+      res.redirect(302, file.redirectUrl);
+      return;
+    }
+    const buf = file.bytes as Buffer;
     res.set({
       'Content-Type': file.mimeType,
       'Content-Disposition': `attachment; filename="${file.name.replace(/"/g, '')}"`,
