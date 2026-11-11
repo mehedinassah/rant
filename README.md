@@ -2,57 +2,50 @@
 
 [![CI](https://github.com/mehedinassah/rant/actions/workflows/ci.yml/badge.svg)](https://github.com/mehedinassah/rant/actions/workflows/ci.yml)
 
-**The operating system for modern software teams.**
+**The incident-to-fix workspace for modern software teams.**
 
-A unified platform where companies plan, develop, deploy, monitor, and maintain
-software. Not a GitHub clone. Not a Jira clone. Not a Vercel clone — a complete
-software engineering ecosystem where every action ripples through the whole
-system.
+Rant turns a production alert into a linked incident, bug, postmortem, and shipped fix — with one unified audit trail across GitHub, Vercel, Sentry, and your team's chat. 
 
-> Status: **all 18 modules implemented.** Auth · Organizations · Workspaces · Projects,
-> a Linear-style project board (Sprints · Epics · Issues · Comments), a
-> GitHub-style repository module (Repos · Branches · Commits · Tags · Releases ·
-> Pull Requests · Reviews · Merge Queue), a GitHub-Actions-style CI/CD engine
-> (Pipelines · Runs · Jobs · Steps · live logs), Vercel-style Deployments
-> (Environments · deployments · preview URLs · rollback), Datadog-style
-> Monitoring (Monitors · time-series metrics · live charts · auto-incidents),
-> a cross-cutting Notification center (per-user feed · live bell · delivery
-> preferences), a Notion-style Documentation base (nested pages · Markdown ·
-> full version history), unified Search (one box across issues, projects,
-> repos, PRs, docs and incidents), an API Platform (programmatic API keys ·
-> OpenAPI docs · outbound webhooks), an Analytics dashboard (deploy
-> frequency · CI pass rate · MTTR · issue throughput across every module),
-> Billing (plans · subscriptions · invoices · plan-gated limits), a grounded
-> AI Copilot (a chat assistant that answers from your live data and cites the
-> records), Files (real multipart upload/download, attachable to any entity),
-> and Team Chat (channels + an activity feed the platform posts into itself) —
-> all implemented end-to-end with RBAC + audit logging, and with frontends for
-> the board, repos, CI runs, deployments, monitoring, notifications, docs,
-> search, API settings, analytics, billing, copilot, files and chat. This is
-> where the platform *connects*: a commit triggers a CI
-> run, a green run gates the PR merge **and** auto-deploys (production on the
-> default branch, a preview URL per pull request), the live URL is then
-> continuously health-checked, a sustained outage **auto-opens an incident,
-> files a bug on the linked project, drafts a postmortem page** in that
-> workspace's docs, **fans out as a notification** to the right people, **posts to
-> the team's activity channel**, and **fires a signed webhook** to external
-> systems — the whole loop from an idea to a live URL to an observed outage to
-> everyone (and everything) that needs to know, inside one system.
->
-> The loop now runs on **real data**, not just simulations: a **GitHub App**
-> syncs repos/commits/PRs/Actions runs, **Vercel** webhooks turn real deployments
-> into rant deployments (retargeting monitoring), and **Sentry** webhooks turn
-> real production errors into rant incidents (with bug issue, postmortem, chat
-> and notifications). A **Socket.IO** gateway pushes the bus to connected UIs,
-> and **OpenTelemetry** tracing is one env var away.
+While the long-term vision is to be the complete "Operating System for Modern Software Teams," our first measurable promise is narrower: **less time from "it's broken" to "it's fixed, and we learned something."**
+
+## 🧠 The Core Idea: The Event Graph
+
+Rant is not a collection of disconnected tools. The platform is built around a single event graph where every action ripples through the system:
+
+`commit → CI → deploy → monitor → incident → bug → postmortem → notification → chat → signed webhook`
+
+Most tools own one box (Jira owns issues, GitHub owns code, Datadog owns monitoring). Rant makes the boxes talk to each other. A commit triggers a CI run, a green run gates the PR merge **and** auto-deploys. The live URL is continuously health-checked. A sustained outage **auto-opens an incident, files a bug, drafts a postmortem, fans out notifications, posts to the team's activity channel, and fires a signed webhook**. 
 
 ---
 
-## Architecture
+## ⚠️ Current Status: High-Fidelity MVP
+
+We believe in total transparency. Rant is currently a **strong internal MVP / high-fidelity demo**, not yet a production SaaS. 
+
+**What is actually built:**
+- **Scale:** ~20,000 lines of TypeScript across 240 source files.
+- **Surface:** 18+ modules, 179 HTTP routes, 49 Prisma models, 6 migrations.
+- **The "Ripple" is Real:** Incident → Bug → Postmortem → Chat → Webhook flows are fully functional and SQA-tested against real Postgres/Redis.
+- **Real Integrations:** GitHub (App + webhooks), Vercel (deployments), and Sentry (incidents). All are signature-verified, deduped, and idempotent.
+- **All 18 Modules Implemented:** Auth, Orgs, Workspaces, Projects (Linear-style), Repos (GitHub-style), CI/CD (Actions-style), Deployments (Vercel-style), Monitoring (Datadog-style), Notifications, Docs (Notion-style), Search, API Platform, Analytics, Billing, AI Copilot, Files, and Team Chat.
+
+**What is currently simulated:**
+- CI pipelines, deployments, and health monitor probes are simulated (unless driven by real external webhooks). The platform records engineering rather than executing real code builds.
+- Billing, email delivery, and object storage are provider-abstracted stubs (ready for Stripe, Resend, and S3).
+
+**Pre-Production Hardening (Blockers):**
+- Migrating JWT tokens from `localStorage` to HttpOnly cookies (CSRF protection).
+- Fixing webhook SSRF vulnerabilities via DNS/IP allowlisting.
+- Adding SSO/SAML, email verification, and MFA.
+- Implementing Postgres RLS (Row Level Security) for hard tenant isolation.
+
+---
+
+## 🏗️ Architecture & Tech Stack
 
 A pnpm + Turborepo monorepo:
 
-```
+```text
 rant/
 ├── apps/
 │   ├── api/        # NestJS backend — layered modules, JWT auth, RBAC guards
@@ -61,434 +54,149 @@ rant/
 │   └── database/   # Prisma schema + generated client (@rant/database)
 ├── docker-compose.yml   # Postgres 16 + Redis 7 for local dev
 └── turbo.json
-```
+Backend flow: Controller → Service → PrismaService → PostgreSQL, with global JwtAuthGuard and RolesGuard. Every meaningful mutation writes to an immutable audit_logs table.
 
-**Backend flow:** `Controller → Service → PrismaService → PostgreSQL`, with
-global `JwtAuthGuard` (opt out via `@Public()`) and a global `RolesGuard` that
-resolves org membership from the `:orgId` route param and enforces `@Roles(...)`.
-Every meaningful mutation writes to an immutable `audit_logs` table.
+Event Bus & Queues: Modules stay decoupled through an internal event bus (@nestjs/event-emitter). CI/CD and Deployments push work onto BullMQ queues (Redis), where background workers execute tasks and stream progress to clients over Server-Sent Events (SSE).
 
-Modules stay decoupled through an internal **event bus** (`@nestjs/event-emitter`):
-one module emits a domain event (`commit.created`, `pull_request.opened`,
-`pipeline_run.completed`, `deployment.completed`, `incident.opened`) and others
-react without importing each other. CI/CD and Deployments push work onto
-**BullMQ queues** (Redis), where background workers execute pipeline runs and
-deployments step-by-step and stream progress to clients over **Server-Sent
-Events**. Monitoring adds a periodic scheduler that probes every live
-deployment, records time-series health, and opens/resolves incidents — a
-critical incident even ripples *back* into project management by filing a bug
-issue. **Notifications** is the pure consumer at the end of the bus: it
-subscribes to CI, deploy, incident and pull-request events and fans each one out
-to the right people's feed (respecting per-category delivery preferences). The
-**API Platform** re-broadcasts those same events as HMAC-signed outbound
-webhooks, and **Team Chat** posts them as system messages into the org's
-activity channel — so the ripple reaches external systems *and* the team's
-conversation. A commit → a CI run → a
-deployment → a monitored URL → an incident → a bug → a notification → a webhook
-is one chain of events, each hop reacting to the last.
+Real-time & Observability: A JWT-authenticated Socket.IO gateway pushes the event bus to connected UIs. OpenTelemetry tracing is one env var away.
 
-Real integrations attach at the edges of that chain without changing it: a
-**GitHub App** maps real pushes/PRs/Actions runs, a **Vercel** webhook maps real
-deployments, and a **Sentry** webhook maps real issues — each verifies the
-provider signature, dedupes the delivery, enqueues a BullMQ job, and then
-**re-emits the same domain events** the simulated modules emit. A **Realtime
-bridge** republishes the bus over a Socket.IO gateway (`/realtime`, JWT-authed,
-membership-checked rooms), complementing the SSE streams, and **OpenTelemetry**
-instruments HTTP/handlers/DB when `OTEL_ENABLED=true`.
+Tech Stack: Next.js 15 · NestJS 10 · Prisma 6 · PostgreSQL · Redis · BullMQ · Socket.IO · OpenAPI/Swagger · TypeScript · argon2 · JWT (access + rotating refresh) · HMAC-signed webhooks.
 
-## Tech stack
+🛠️ Getting Started (Local Development)
+Prerequisites: Node.js ≥ 20, pnpm, and Postgres 16 + Redis (easiest via Docker).
 
-Next.js 15 · NestJS 10 · Prisma 6 · PostgreSQL · Redis · BullMQ (queue + worker) ·
-Server-Sent Events · Socket.IO · OpenTelemetry · in-process scheduler ·
-OpenAPI/Swagger · Turborepo · pnpm · TypeScript · argon2 · JWT (access + rotating
-refresh tokens) · API keys + HMAC-signed webhooks.
-
-## Prerequisites
-
-- Node.js ≥ 20 (tested on 22)
-- pnpm (`npm i -g pnpm`)
-- **Postgres 16 + Redis** — easiest via Docker: `docker compose up -d`
-  (or point `DATABASE_URL` at any Postgres instance, e.g. Neon/Supabase).
-
-## Getting started
-
-```bash
-# 1. install
+bash
+# 1. Install
 pnpm install
 
-# 2. env
+# 2. Env
 cp .env.example .env      # then edit secrets if you like
 
-# 3. database (needs Postgres running)
+# 3. Database (needs Docker running)
 docker compose up -d      # starts postgres + redis
-pnpm db:migrate:deploy    # apply migrations (canonical)
+pnpm db:migrate:deploy    # apply migrations
 pnpm db:seed              # demo org/workspace/project
 
-# 4. run everything (api + web + db watcher)
+# 4. Run everything
 pnpm dev
-```
-
-- API → http://localhost:4000/api/v1 (health: `/api/v1/health`)
-- API docs (OpenAPI/Swagger) → http://localhost:4000/docs
-- Web → http://localhost:3000
-
-### Run the whole stack in Docker
-
-Both apps are containerized (multi-stage builds; the web image uses Next.js
-standalone output; the API image applies migrations on boot). The app services
-live behind a compose **profile** so the default `up` stays dev-only:
-
-```bash
-# just the datastores (for local `pnpm dev`)
-docker compose up -d
-
-# the full stack — postgres + redis + api + web
-docker compose --profile app up -d --build
-# → web http://localhost:3000 · api http://localhost:4000
-```
-
-The API container runs `prisma migrate deploy` before starting, so a fresh
-database is provisioned automatically.
-
-## Useful scripts
-
-| Command             | Description                                  |
-| ------------------- | -------------------------------------------- |
-| `pnpm dev`          | Run all apps in watch mode (Turborepo)       |
-| `pnpm build`        | Build every package/app                      |
-| `pnpm typecheck`    | Typecheck the whole repo                     |
-| `pnpm test`         | Run the unit test suite                      |
-| `pnpm test:e2e`     | Run the e2e suite (needs Postgres + Redis)   |
-| `pnpm sqa`          | Full API SQA against a running stack         |
-| `pnpm sqa:ui`       | Browser-level SQA + screenshots              |
-| `pnpm db:migrate`   | Create + apply a new migration (dev)         |
-| `pnpm db:migrate:deploy` | Apply pending migrations (prod/CI)      |
-| `pnpm db:push`      | Fast schema sync, no migration (prototyping) |
-| `pnpm db:seed`      | Seed demo data                               |
-| `pnpm db:studio`    | Open Prisma Studio                           |
-
-### Database migrations
-
-Schema changes are tracked as versioned SQL migrations under
-`packages/database/prisma/migrations/` — `prisma migrate deploy` applies them
-deterministically in every environment (this is what CI/prod use). `db:push`
-remains available for quick local prototyping, but committed schema changes
-should ship as a migration (`pnpm db:migrate --name <change>`).
-
-> **Existing dev database?** If your local DB was created with `db:push` before
-> migrations existed, baseline it once so Prisma knows the initial migration is
-> already applied: `pnpm db:migrate:baseline`. Fresh databases skip this.
-
-## Testing & CI
-
-The repo ships two layers of tests:
-
-- **Unit** (`pnpm test`) — pure logic with no DB: API-key hashing, pagination
-  clamping, the CI/deploy simulation predicates, the copilot's intent classifier,
-  and the integration mappers, signature verification and dedupe for GitHub,
-  Vercel and Sentry.
-- **E2E / integration** (`pnpm test:e2e`) — boots the real `AppModule` against
-  Postgres + Redis and drives it over HTTP with supertest: register → org →
-  workspace → project → issue → comment → audit; RBAC tenant isolation; billing;
-  signed **Vercel** and **Sentry** webhooks passing through BullMQ workers into
-  deployments/incidents (and the notification, chat, bug-issue and postmortem
-  ripple); and an authenticated **Socket.IO** subscriber receiving
-  `incident.opened`.
-
-A **GitHub Actions** workflow (`.github/workflows/ci.yml`) runs `install → prisma
-generate → typecheck → unit tests → migrate deploy → e2e → build` on every push
-and pull request, with Postgres 16 + Redis 7 service containers.
-
-Locally, the e2e suite truncates every table, so point it at a throwaway database:
-
-```bash
-docker compose up -d
-docker exec rant-postgres psql -U rant -d postgres -c 'CREATE DATABASE rant_e2e'
-DATABASE_URL='postgresql://rant:rant@localhost:5432/rant_e2e?schema=public' pnpm test:e2e
-```
-
-The e2e harness uses Redis database **1** (`REDIS_URL` supports `/1`) so it never
-competes with a running dev stack's BullMQ workers on database 0.
-
-### SQA
-
-Two black-box suites exist for manual verification against a running stack:
-
-- `pnpm sqa` — creates a throwaway **SQA Corp** org and exercises every module
-  end to end: auth, planning, RBAC, billing limits, repos/commits/PRs/merge
-  queue, CI → deploy → monitor → incident → bug → postmortem → notifications →
-  chat → signed webhook ripple, Vercel/Sentry ingestion, Socket.IO, docs/search/
-  copilot/files/API keys/analytics/audit, and all UI routes.
-- `pnpm sqa:ui` — drives a headless browser through the real login form and key
-  screens, asserts rendered content, and captures screenshots.
-
-The latest run and defect log live in [docs/sqa-report.md](docs/sqa-report.md).
-
-The API is hardened with **helmet** (security headers) and **rate limiting**
-(`@nestjs/throttler`: 120 req/min per IP, 10/min on auth), and list endpoints
-that can grow (the audit log) are **paginated**.
-
-## API surface
-
-Base URL: `/api/v1`
-
-**Auth** — `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` ·
-`POST /auth/logout` · `GET /auth/me`
-
-**Organizations** — `GET|POST /organizations` ·
-`GET|PATCH|DELETE /organizations/:orgId` ·
-`GET|POST /organizations/:orgId/members` ·
-`PATCH|DELETE /organizations/:orgId/members/:userId`
-
-**Invitations** — `GET|POST /organizations/:orgId/invitations` ·
-`DELETE /organizations/:orgId/invitations/:invitationId` ·
-`GET /invitations/:token` (public preview) ·
-`POST /invitations/:token/accept`. Email-first: an invite issues a tokenised,
-7-day-expiry link (delivered through a pluggable mail stub) that survives the
-invitee's sign-up; accepting is gated on the plan's seat limit and matched to
-the invited email address.
-
-**GitHub integration** — `POST /integrations/github/webhook` (public, HMAC-signed) ·
-`GET|POST|DELETE /organizations/:orgId/integrations/github[/…]` (install-url,
-complete-install, status, resync, disconnect — ADMIN) ·
-`GET|POST|DELETE /integrations/github/account` (link your GitHub identity). A
-GitHub App is installed per org; verified webhooks are deduped and enqueued, then
-a worker maps real pushes, PRs, reviews and Actions runs onto rant's models and
-**re-emits the existing domain events** — so a real failed CI run opens an
-incident, posts to `#activity` and notifies the team through the same ripple as
-the simulated modules. See the [design spec](docs/github-integration.md) and the
-[setup walkthrough](docs/github-setup.md). Disabled until a GitHub App is configured
-(`FEATURE_GITHUB` / `GITHUB_*` env).
-
-**Vercel integration** — `POST /integrations/vercel/webhook` (public, HMAC-signed) ·
-`GET /organizations/:orgId/integrations/vercel/status|links|deliveries` ·
-`POST|DELETE /organizations/:orgId/integrations/vercel/links[/:linkId]` (ADMIN).
-A webhook delivery is verified (`x-vercel-signature`), deduped by `x-vercel-id`
-and enqueued; the worker maps `deployment.created|ready|error|canceled` onto a
-rant `Deployment` (with `source = VERCEL` and the provider id), sets the
-environment's live deployment on success and **emits `deployment.completed`** —
-so monitoring retargets the real URL and the notification/chat/webhook ripple
-fires. Disabled until `VERCEL_WEBHOOK_SECRET` is set (`FEATURE_VERCEL`).
-See the [deploy-monitor spec](docs/deploy-monitor-integrations.md).
-
-**Sentry integration** — `POST /integrations/sentry/webhook` (public, HMAC-signed) ·
-`GET /organizations/:orgId/integrations/sentry/status|links|deliveries` ·
-`POST|DELETE /organizations/:orgId/integrations/sentry/links[/:linkId]` (ADMIN).
-Sentry issue events (`created`, `resolved`, `unresolved`) are verified
-(`sentry-hook-signature`), deduped, enqueued and mapped onto a rant `Incident`
-(`source = SENTRY`): opening files a bug on the linked project and emits
-`incident.opened` (a `CRITICAL` issue also drafts a postmortem doc), resolving
-closes the incident and its bug and emits `incident.resolved`. Disabled until
-`SENTRY_WEBHOOK_SECRET` is set (`FEATURE_SENTRY`).
-
-**Workspaces** — `GET|POST /organizations/:orgId/workspaces` ·
-`GET|PATCH|DELETE /organizations/:orgId/workspaces/:workspaceId`
-
-**Projects** —
-`GET|POST /organizations/:orgId/workspaces/:workspaceId/projects` ·
-`GET|PATCH|DELETE .../projects/:projectId`
-
-**Sprints** — `GET|POST .../projects/:projectId/sprints` ·
-`GET|PATCH|DELETE .../sprints/:sprintId`
-
-**Epics** — `GET|POST .../projects/:projectId/epics` ·
-`GET|PATCH|DELETE .../epics/:epicId`
-
-**Issues** — `GET|POST .../projects/:projectId/issues`
-(filterable by `status`, `type`, `sprintId`, `epicId`, `assigneeId`) ·
-`GET|PATCH|DELETE .../issues/:issueId` · atomic per-project numbering
-(`RANT-123`), subtasks, story points
-
-**Comments** — `GET|POST .../issues/:issueId/comments` ·
-`DELETE .../comments/:commentId` (author or MANAGER+)
-
-**Repositories** — `GET|POST /organizations/:orgId/repositories` ·
-`GET|PATCH|DELETE .../repositories/:repoId`
-
-**Branches** — `GET|POST .../:repoId/branches` · `DELETE .../branches/:name`
-
-**Commits** — `GET|POST .../:repoId/commits` (advances branch head) ·
-`GET .../commits/:sha`
-
-**Tags / Releases** — `GET|POST .../:repoId/tags` · `DELETE .../tags/:name` ·
-`GET|POST .../:repoId/releases` · `DELETE .../releases/:releaseId`
-
-**Pull Requests** — `GET|POST .../:repoId/pulls` · `GET|PATCH .../pulls/:number` ·
-`GET|POST .../pulls/:number/reviews` · `POST .../pulls/:number/merge`
-(gated on reviews — blocks if changes requested)
-
-**Merge Queue** — `POST|DELETE .../pulls/:number/queue` (enqueue/dequeue) ·
-`GET .../:repoId/merge-queue` · `POST .../merge-queue/process`
-
-**Pipelines (CI/CD)** — `GET|POST .../:repoId/pipelines` ·
-`GET|PATCH|DELETE .../pipelines/:pipelineId` ·
-`POST .../pipelines/:pipelineId/run` (manual dispatch). A pipeline holds a
-declarative `{ jobs: [ { name, steps: [ { name, run } ] } ] }` config and
-subscribes to triggers (`PUSH`, `PULL_REQUEST`, `MANUAL`). Pushing a commit or
-opening a PR auto-starts matching runs on a background worker.
-
-**Runs** — `GET .../:repoId/runs` · `GET .../runs/:runId` (jobs + steps + logs) ·
-`GET .../runs/:runId/stream` (Server-Sent Events, live) ·
-`POST .../runs/:runId/cancel`. A PR's newest run must be green before it can
-merge — a failing or in-flight run blocks the merge with `409`.
-
-**Environments** — `GET|POST .../:repoId/environments` ·
-`PATCH|DELETE .../environments/:envId` ·
-`POST .../environments/:envId/deploy` (manual) ·
-`POST .../environments/:envId/rollback`. A repo is created with a Production
-environment that watches its default branch; each environment tracks the
-`currentDeployment` that is live right now.
-
-**Deployments** — `GET .../:repoId/deployments` ·
-`GET .../deployments/:deploymentId` ·
-`GET .../deployments/:deploymentId/stream` (Server-Sent Events, live logs) ·
-`POST .../deployments/:deploymentId/cancel`. A background worker runs
-BUILDING → DEPLOYING → READY and assigns a public URL. **The ripple:** a green
-CI run auto-deploys — production for a push to the watched branch, a
-PR-scoped preview URL for a pull request.
-
-**Monitors** — `GET .../:repoId/monitors` (per-environment health + 30-min
-rollup) · `GET .../monitors/:monitorId` · `GET .../monitors/:monitorId/metrics`
-(time-series samples) · `GET .../monitors/:monitorId/stream` (Server-Sent
-Events, live metrics) · `PATCH .../monitors/:monitorId` (pause/rename) ·
-`POST .../monitors/:monitorId/simulate` (inject/clear an outage for demos). A
-monitor is created for each environment; once a deployment is live an in-process
-scheduler probes it every few seconds, recording latency/uptime.
-
-**Incidents** — `GET .../:repoId/incidents` · `GET .../incidents/:incidentId` ·
-`POST .../incidents/:incidentId/acknowledge` ·
-`POST .../incidents/:incidentId/resolve`. **The ripple closes the loop:** two
-consecutive failed checks auto-open an incident (CRITICAL on production) and
-file a `BUG` issue on the repo's linked project; a recovered check auto-resolves
-the incident and closes that issue.
-
-**Notifications** (user-scoped, no `:orgId`) — `GET /notifications`
-(`?unread=true`) · `GET /notifications/unread-count` ·
-`GET /notifications/stream` (Server-Sent Events, live bell) ·
-`POST /notifications/:id/read` · `POST /notifications/read-all` ·
-`DELETE /notifications/:id` · `GET|PUT /notifications/preferences`. A pure
-consumer of the event bus: a failed CI run, a deploy, an opened/resolved
-incident and a new pull request each fan out to the relevant members' feed
-(by org role), respecting per-category in-app/email preferences. Email is a
-logged stub until a real provider is wired up.
-
-**Realtime** — Socket.IO namespace `/realtime` (not REST). The handshake carries
-the JWT access token; a client joins `subscribe:org` / `subscribe:channel` rooms,
-each re-checking active membership, and receives `notification.created` (its user
-room) plus `commit.created`, `pull_request.opened`, `pipeline_run.completed`,
-`deployment.completed`, `incident.opened|resolved` and `chat.message` for the
-rooms it joined. The SSE streams remain available as a one-way fallback; the
-gateway is what makes the notification bell and open chat thread update instantly.
-
-**Documentation** — `GET|POST .../workspaces/:workspaceId/docs` (page tree) ·
-`GET|PATCH|DELETE .../docs/:docId` · `GET .../docs/:docId/revisions` ·
-`GET .../docs/:docId/revisions/:revisionId` ·
-`POST .../docs/:docId/revisions/:revisionId/restore`. A workspace knowledge base
-of nested Markdown pages; every edit snapshots an immutable revision (restore is
-itself reversible). Also a bus consumer — a CRITICAL incident auto-drafts a
-templated postmortem page in the affected repo's workspace.
-
-**Search** — `GET .../search?q=&types=&limit=` (unified, org-scoped search across
-issues, projects, repositories, pull requests, docs and incidents; results
-grouped by type with matched-text snippets and a frontend deep-link each) ·
-`GET|POST .../search/saved` · `DELETE .../search/saved/:id` (per-user pinned
-queries). The payoff of one connected system — a single box finds anything, and
-every result jumps straight to the module that owns it.
-
-**Analytics** — `GET .../analytics/overview?days=` (org-wide rollup computed live
-across every module: totals, issue throughput + status mix, deployment frequency
-+ success rate, CI pass rate, incident count + MTTR, monitor uptime, and the
-most-deployed repos). No new storage — it aggregates the data the other modules
-already produce.
-
-**Team Chat** — `GET|POST .../channels` · `GET|POST .../channels/:id/messages` ·
-`GET .../channels/:id/stream` (Server-Sent Events, live thread). Each org gets a
-`#general` channel and a system `#activity` channel; the **integration layer**
-posts SYSTEM messages into `#activity` whenever a deploy, incident, CI failure
-or pull request fires — the event bus flowing straight into the conversation.
-
-**Files** — `POST .../files` (multipart upload, field `file`, optional
-`targetType`/`targetId` to attach) · `GET .../files` (list, filterable by
-target) · `GET .../files/:fileId` · `GET .../files/:fileId/download` (streams the
-bytes with the right content-type) · `DELETE .../files/:fileId`. There's no real
-S3 — bytes live in the database (5 MB cap) behind a synthetic CDN URL — but
-uploads and downloads genuinely round-trip, and a file can attach to any entity.
-
-**Copilot** — `POST .../copilot/ask` (message + optional conversationId) ·
-`GET .../copilot/conversations` · `GET|DELETE .../copilot/conversations/:id` ·
-`GET .../copilot/suggestions`. A **grounded** assistant: it classifies intent
-and answers from live org data — “what’s broken?” lists open incidents, down
-monitors and recent CI/deploy failures; “what shipped this week?” counts
-deployments, merged PRs and completed issues; “what should I work on?” returns
-your open issues by priority; “give me a summary” snapshots the org. Every
-answer **cites the exact records** with deep-links, and conversations are saved.
-(No external LLM — the reasoning is deterministic and data-backed.)
-
-**Billing** — `GET .../billing/plans` · `GET .../billing/subscription` ·
-`GET .../billing/usage` · `GET .../billing/invoices` ·
-`POST .../billing/subscription` (change plan) ·
-`POST .../billing/subscription/cancel|resume`. Every org has a subscription
-(FREE by default) whose plan **gates how many members / repositories / projects
-it can create** — exceeding the limit returns a `403` with an upgrade prompt,
-enforced right in those create paths. Changing to a paid plan mints a simulated
-invoice. No real payment processor; the money is make-believe, the enforcement
-is real.
-
-**API Platform** — `GET|POST .../api-keys` · `DELETE .../api-keys/:keyId`
-(programmatic keys; the raw secret is shown once, stored only as a SHA-256 hash).
-A key authenticates via `X-API-Key:` or `Authorization: Bearer rant_…` and acts
-as its creating user, so all RBAC applies. `GET|POST .../webhooks` ·
-`PATCH|DELETE .../webhooks/:id` · `GET .../webhooks/:id/deliveries` ·
-`GET .../webhook-events` — subscribe an endpoint to bus events and receive
-HMAC-signed (`X-Rant-Signature`) POSTs, with every attempt logged. Interactive
-**OpenAPI docs** are served at `/docs`.
-
-## Roles (RBAC)
-
-`OWNER · ADMIN · MANAGER · DEVELOPER · QA · DEVOPS · VIEWER · GUEST`
-
-`OWNER` and `ADMIN` may perform any org-scoped action; other roles are granted
-per-route via `@Roles(...)`.
-
-## Roadmap
-
-All 18 modules from the system design are implemented, plus a hardening pass:
-**security headers + rate limiting**, an **Audit UI** with **pagination**, a
-**unit test suite wired into GitHub Actions CI**, a **token-based member-invite
-flow** (email-first invitations with an accept page and a pluggable mail stub),
-and a **real GitHub integration** — the first module whose data is genuinely
-external. A GitHub App syncs repos/commits/PRs/Actions runs and re-emits rant's
-domain events, so a real failed CI run ripples into incidents, chat and
-notifications exactly like the simulated modules
-([spec](docs/github-integration.md)).
-
-On top of that, a **production-plumbing pass** makes the platform deployable and
-extensible without code changes:
-- **Prisma migrations** as the source of truth (`migrate deploy`), replacing
-  `db push`.
-- **Dockerized** API + web (multi-stage; Next.js standalone; the API
-  self-migrates on boot) with a `docker compose --profile app` full stack.
-- **Liveness/readiness probes** (`/health`, `/health/ready`) + a structured
-  request log.
-- **Provider abstractions** so real backends drop in behind an env var, keeping
-  the zero-config default: **email** (console → Resend), **object storage**
-  (Postgres blobs → S3/R2 with presigned URLs), and **billing** (simulated →
-  real Stripe Checkout + webhooks).
-
-The integration pass now covers all three edges of the loop:
-
-- **GitHub** — repos/commits/PRs/reviews/Actions runs ([spec](docs/github-integration.md)).
-- **Vercel** — real deployments into the existing Deployment model, retargeting
-  monitoring ([spec](docs/deploy-monitor-integrations.md)).
-- **Sentry** — real issues into the existing Incident model, driving the bug,
-  postmortem, chat and notification ripple.
-- **Real-time** — a JWT-authenticated Socket.IO gateway + event-bus bridge.
-- **Observability** — opt-in OpenTelemetry (HTTP + per-handler spans).
-- **Tests** — a real Postgres/Redis e2e suite wired into CI, covering the core
-  flow, RBAC isolation, both new webhooks and the socket push.
-
-What remains is depth rather than missing modules: provider backfill (listing
-Vercel/Sentry projects via their APIs instead of linking by id), presence/typing
-over the gateway, replacing the remaining SSE polls entirely, load/chaos testing
-of the webhook workers, and shipping OTel metrics + log correlation with a
-collector in the compose stack.
+Web: http://localhost:3000
+
+API: http://localhost:4000/api/v1 (health: /api/v1/health)
+
+Swagger Docs: http://localhost:4000/docs
+
+Testing & SQA
+We take quality seriously. The repo ships with:
+
+Unit tests (pnpm test): Pure logic, signature verification, dedupe.
+
+E2E tests (pnpm test:e2e): Real Postgres/Redis, supertest HTTP driving, RBAC isolation, Socket.IO.
+
+SQA API (pnpm sqa): 92 black-box checks against a running stack.
+
+SQA UI (pnpm sqa:ui): Headless browser driving the real login/UI, capturing screenshots.
+
+(The latest run and defect log live in docs/sqa-report.md).
+
+🗺️ Roadmap to Production
+Phase 1: Pilot-Ready (3–4 weeks)
+
+□ Implement HttpOnly cookie sessions (CSRF protection).
+□ Add email verification and password reset.
+□ Fix webhook SSRF vulnerabilities.
+□ Add Redis Socket.IO adapter for multi-instance real-time.
+□ Setup BullMQ Dead Letter Queues (DLQ) and graceful shutdown.
+□ Add backup/PITR drills and Sentry error tracking for Rant itself.
+Phase 2: Public SaaS (3–6 months)
+
+□ Postgres RLS and formal multi-tenant isolation tests.
+□ External penetration testing and SOC2 readiness.
+□ Real CI/CD execution (actual builds, not simulations).
+□ Onboarding flows, importers (Jira/GitHub), and live Stripe billing.
+Phase 3: Depth & AI
+
+□ Provider backfill (listing Vercel/Sentry projects via APIs).
+□ LLM-powered Copilot over your team's incident data.
+□ Advanced DORA metrics and engineering analytics.
+<details> <summary><b>📚 Click to view the full API Surface (179 Routes)</b></summary>
+Base URL: /api/v1
+
+Auth — POST /auth/register · POST /auth/login · POST /auth/refresh · POST /auth/logout · GET /auth/me
+
+Organizations — GET|POST /organizations · GET|PATCH|DELETE /organizations/:orgId · GET|POST /organizations/:orgId/members · PATCH|DELETE /organizations/:orgId/members/:userId
+
+Invitations — GET|POST /organizations/:orgId/invitations · DELETE /organizations/:orgId/invitations/:invitationId · GET /invitations/:token (public preview) · POST /invitations/:token/accept.
+
+GitHub integration — POST /integrations/github/webhook (public, HMAC-signed) · GET|POST|DELETE /organizations/:orgId/integrations/github[/…] (install-url, complete-install, status, resync, disconnect — ADMIN) · GET|POST|DELETE /integrations/github/account. See the design spec.
+
+Vercel integration — POST /integrations/vercel/webhook (public, HMAC-signed) · GET /organizations/:orgId/integrations/vercel/status|links|deliveries · POST|DELETE /organizations/:orgId/integrations/vercel/links[/:linkId] (ADMIN). See the deploy-monitor spec.
+
+Sentry integration — POST /integrations/sentry/webhook (public, HMAC-signed) · GET /organizations/:orgId/integrations/sentry/status|links|deliveries · POST|DELETE /organizations/:orgId/integrations/sentry/links[/:linkId] (ADMIN).
+
+Workspaces — GET|POST /organizations/:orgId/workspaces · GET|PATCH|DELETE /organizations/:orgId/workspaces/:workspaceId
+
+Projects — GET|POST /organizations/:orgId/workspaces/:workspaceId/projects · GET|PATCH|DELETE .../projects/:projectId
+
+Sprints — GET|POST .../projects/:projectId/sprints · GET|PATCH|DELETE .../sprints/:sprintId
+
+Epics — GET|POST .../projects/:projectId/epics · GET|PATCH|DELETE .../epics/:epicId
+
+Issues — GET|POST .../projects/:projectId/issues (filterable by status, type, sprintId, epicId, assigneeId) · GET|PATCH|DELETE .../issues/:issueId · atomic per-project numbering (RANT-123), subtasks, story points.
+
+Comments — GET|POST .../issues/:issueId/comments · DELETE .../comments/:commentId (author or MANAGER+)
+
+Repositories — GET|POST /organizations/:orgId/repositories · GET|PATCH|DELETE .../repositories/:repoId
+
+Branches — GET|POST .../:repoId/branches · DELETE .../branches/:name
+
+Commits — GET|POST .../:repoId/commits (advances branch head) · GET .../commits/:sha
+
+Tags / Releases — GET|POST .../:repoId/tags · DELETE .../tags/:name · GET|POST .../:repoId/releases · DELETE .../releases/:releaseId
+
+Pull Requests — GET|POST .../:repoId/pulls · GET|PATCH .../pulls/:number · GET|POST .../pulls/:number/reviews · POST .../pulls/:number/merge (gated on reviews — blocks if changes requested)
+
+Merge Queue — POST|DELETE .../pulls/:number/queue (enqueue/dequeue) · GET .../:repoId/merge-queue · POST .../merge-queue/process
+
+Pipelines (CI/CD) — GET|POST .../:repoId/pipelines · GET|PATCH|DELETE .../pipelines/:pipelineId · POST .../pipelines/:pipelineId/run (manual dispatch).
+
+Runs — GET .../:repoId/runs · GET .../runs/:runId (jobs + steps + logs) · GET .../runs/:runId/stream (Server-Sent Events, live) · POST .../runs/:runId/cancel.
+
+Environments — GET|POST .../:repoId/environments · PATCH|DELETE .../environments/:envId · POST .../environments/:envId/deploy (manual) · POST .../environments/:envId/rollback.
+
+Deployments — GET .../:repoId/deployments · GET .../deployments/:deploymentId · GET .../deployments/:deploymentId/stream (Server-Sent Events, live logs) · POST .../deployments/:deploymentId/cancel.
+
+Monitors — GET .../:repoId/monitors (per-environment health + 30-min rollup) · GET .../monitors/:monitorId · GET .../monitors/:monitorId/metrics · GET .../monitors/:monitorId/stream (SSE) · PATCH .../monitors/:monitorId · POST .../monitors/:monitorId/simulate.
+
+Incidents — GET .../:repoId/incidents · GET .../incidents/:incidentId · POST .../incidents/:incidentId/acknowledge · POST .../incidents/:incidentId/resolve.
+
+Notifications — GET /notifications · GET /notifications/unread-count · GET /notifications/stream (SSE) · POST /notifications/:id/read · POST /notifications/read-all · DELETE /notifications/:id · GET|PUT /notifications/preferences.
+
+Realtime — Socket.IO namespace /realtime. Handshake carries JWT token; clients join subscribe:org / subscribe:channel rooms.
+
+Documentation — GET|POST .../workspaces/:workspaceId/docs (page tree) · GET|PATCH|DELETE .../docs/:docId · GET .../docs/:docId/revisions · GET .../docs/:docId/revisions/:revisionId · POST .../docs/:docId/revisions/:revisionId/restore.
+
+Search — GET .../search?q=&types=&limit= (unified, org-scoped) · GET|POST .../search/saved · DELETE .../search/saved/:id.
+
+Analytics — GET .../analytics/overview?days= (org-wide rollup: issue throughput, deployment frequency, CI pass rate, MTTR, monitor uptime).
+
+Team Chat — GET|POST .../channels · GET|POST .../channels/:id/messages · GET .../channels/:id/stream (SSE).
+
+Files — POST .../files (multipart upload) · GET .../files · GET .../files/:fileId · GET .../files/:fileId/download · DELETE .../files/:fileId.
+
+Copilot — POST .../copilot/ask · GET .../copilot/conversations · GET|DELETE .../copilot/conversations/:id · GET .../copilot/suggestions.
+
+Billing — GET .../billing/plans · GET .../billing/subscription · GET .../billing/usage · GET .../billing/invoices · POST .../billing/subscription · POST .../billing/subscription/cancel|resume.
+
+API Platform — GET|POST .../api-keys · DELETE .../api-keys/:keyId · GET|POST .../webhooks · PATCH|DELETE .../webhooks/:id · GET .../webhooks/:id/deliveries · GET .../webhook-events.
+
+</details>
+Built with 🖤 for software teams who are tired of context switching.
+
+text
+
+### Final Steps:
+Run these commands in PowerShell:
+```powershell
+git add README.md
+git commit -m "docs: merged technical architecture with strategic vision and MVP transparency"
+git push
