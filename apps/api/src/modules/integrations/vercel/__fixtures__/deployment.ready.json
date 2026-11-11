@@ -1,0 +1,19 @@
+{
+  "type": "deployment.ready",
+  "payload": {
+    "deployment": {
+      "id": "dpl_abc123",
+      "url": "rant-demo-abc123.vercel.app",
+      "name": "rant-demo",
+      "target": "production",
+      "meta": {
+        "githubCommitSha": "d34db33fcafebabe0000000000000000deadbeef",
+        "githubCommitRef": "main",
+        "githubCommitRepo": "rant",
+        "githubPrId": "42"
+      }
+    },
+    "project": { "id": "prj_vercel_demo", "name": "rant-demo" },
+    "team": { "id": "team_acme" }
+  }
+}

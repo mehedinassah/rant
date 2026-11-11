@@ -9,6 +9,7 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import { AuditModule } from './common/audit/audit.module';
 import { MailModule } from './common/mail/mail.module';
 import { StorageModule } from './common/storage/storage.module';
+import { RealtimeModule } from './common/realtime/realtime.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
@@ -34,9 +35,12 @@ import { FilesModule } from './modules/files/files.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AuditViewModule } from './modules/audit/audit.module';
 import { GithubModule } from './modules/integrations/github/github.module';
+import { VercelModule } from './modules/integrations/vercel/vercel.module';
+import { SentryModule } from './modules/integrations/sentry/sentry.module';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { TracingInterceptor } from './common/telemetry/tracing.interceptor';
 
 @Module({
   imports: [
@@ -56,11 +60,17 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const url = new URL(config.get<string>('REDIS_URL', 'redis://localhost:6379'));
+        // Support `redis://host:6379/1` database selection so environments on
+        // the same Redis (dev vs e2e vs staging) never share BullMQ queues.
+        const dbSegment = url.pathname.replace(/^\//, '');
+        const db = dbSegment === '' ? undefined : Number(dbSegment);
         return {
           connection: {
             host: url.hostname,
             port: Number(url.port || 6379),
+            username: url.username || undefined,
             password: url.password || undefined,
+            ...(Number.isInteger(db) ? { db } : {}),
           },
         };
       },
@@ -69,6 +79,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     AuditModule,
     MailModule,
     StorageModule,
+    RealtimeModule,
     AuthModule,
     OrganizationsModule,
     InvitationsModule,
@@ -92,12 +103,16 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     ChatModule,
     AuditViewModule,
     GithubModule,
+    VercelModule,
+    SentryModule,
   ],
   controllers: [HealthController],
   providers: [
     HealthService,
     // Structured access log for every request.
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    // Per-handler tracing (no-op unless OTEL_ENABLED=true).
+    { provide: APP_INTERCEPTOR, useClass: TracingInterceptor },
     // Rate limiting runs first, before any auth work.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // JWT auth is on by default; opt out per-route with @Public().

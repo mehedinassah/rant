@@ -98,12 +98,22 @@ enum RepositoryVisibility {
   PUBLIC
 }
 
-/// Provenance of a code record: created inside rant vs synced from an external
-/// provider (GitHub). GITHUB records are read-only in rant; the provider is the
-/// system of record.
+/// Provenance of a record: created inside rant vs synced from an external
+/// provider. GITHUB/VERCEL/SENTRY records are read-only in rant; the provider is
+/// the system of record.
 enum RecordSource {
   NATIVE
   GITHUB
+  VERCEL
+  SENTRY
+}
+
+/// External provider that can feed a repository's deployments (Vercel) or
+/// incidents (Sentry). Kept as its own enum so the generic link/ledger tables
+/// can branch without a proliferation of provider-specific tables.
+enum IntegrationProvider {
+  VERCEL
+  SENTRY
 }
 
 enum PullRequestStatus {
@@ -339,6 +349,7 @@ model Organization {
   files            FileObject[]
   channels         Channel[]
   githubInstallation GithubInstallation?
+  integrationLinks IntegrationProjectLink[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -559,6 +570,7 @@ model Repository {
   pullRequests PullRequest[]
   pipelines    Pipeline[]
   environments Environment[]
+  integrationLinks IntegrationProjectLink[]
 
   @@unique([organizationId, slug])
   @@unique([organizationId, externalId])
@@ -733,6 +745,55 @@ model GithubWebhookDelivery {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Deploy/monitor integrations (Vercel · Sentry). Deliberately provider-agnostic:
+// one table links an external project to a rant repository/environment, and one
+// ledger dedupes inbound webhooks for every provider. Adding a third provider is
+// a new enum value + a mapper, not a new schema.
+// ─────────────────────────────────────────────────────────────
+
+/// Links an external provider project (a Vercel project, a Sentry project) to
+/// the rant repository whose deployments/incidents it feeds.
+model IntegrationProjectLink {
+  id                  String              @id @default(cuid())
+  organizationId      String
+  provider            IntegrationProvider
+  /// Provider-side project id — env("VERCEL") project id or Sentry project id.
+  externalProjectId   String
+  /// Human-readable provider project name/slug, for display.
+  externalProjectName String?
+  repositoryId        String
+  /// Override which environment real deployments land in (default: Production).
+  environmentId       String?
+  createdAt           DateTime            @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  environment  Environment? @relation(fields: [environmentId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, externalProjectId])
+  @@index([organizationId, provider])
+  @@index([repositoryId])
+  @@map("integration_project_links")
+}
+
+/// Provider-scoped idempotency ledger for inbound webhooks (Vercel, Sentry, …).
+model IntegrationWebhookDelivery {
+  id                String              @id @default(cuid())
+  provider          IntegrationProvider
+  deliveryId        String
+  event             String
+  /// Provider project id parsed from the delivery, when resolvable. Lets an
+  /// org see only deliveries for projects it has linked.
+  externalProjectId String?
+  receivedAt        DateTime            @default(now())
+
+  @@unique([provider, deliveryId])
+  @@index([provider, receivedAt])
+  @@index([provider, externalProjectId])
+  @@map("integration_webhook_deliveries")
+}
+
+// ─────────────────────────────────────────────────────────────
 // CI/CD (GitHub-Actions-style): pipelines · runs · jobs · steps.
 // A pipeline is a config attached to a repo; pushes and pull requests
 // trigger runs, which a background worker executes step-by-step. A run's
@@ -853,6 +914,7 @@ model Environment {
   currentDeployment Deployment?  @relation("CurrentDeployment", fields: [currentDeploymentId], references: [id], onDelete: SetNull)
   deployments       Deployment[] @relation("EnvDeployments")
   monitor           Monitor?
+  integrationLinks  IntegrationProjectLink[]
 
   @@unique([repositoryId, slug])
   @@index([repositoryId])
@@ -871,6 +933,9 @@ model Deployment {
   pullRequestId String?
   triggeredById String?
   isRollback    Boolean          @default(false)
+  source        RecordSource     @default(NATIVE)
+  /// Provider deployment id (e.g. Vercel `dpl_…`); stable for idempotent upserts.
+  externalId    String?
   startedAt     DateTime?
   finishedAt    DateTime?
   createdAt     DateTime         @default(now())
@@ -881,6 +946,7 @@ model Deployment {
   triggeredBy User?        @relation("DeployTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
 
   @@unique([environmentId, number])
+  @@unique([environmentId, externalId])
   @@index([environmentId, status])
   @@index([pullRequestId])
   @@map("deployments")
@@ -949,6 +1015,9 @@ model Incident {
   summary    String?
   /// Bug issue auto-created from this incident (the ripple into project mgmt).
   issueId    String?          @unique
+  source     RecordSource     @default(NATIVE)
+  /// Provider issue id (e.g. Sentry issue id); stable for idempotent upserts.
+  externalId String?
   startedAt  DateTime         @default(now())
   resolvedAt DateTime?
   createdAt  DateTime         @default(now())
@@ -957,6 +1026,7 @@ model Incident {
   monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
   issue   Issue?  @relation(fields: [issueId], references: [id], onDelete: SetNull)
 
+  @@unique([monitorId, externalId])
   @@index([monitorId, status])
   @@map("incidents")
 }

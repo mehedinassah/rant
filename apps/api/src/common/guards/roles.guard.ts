@@ -27,6 +27,10 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Only HTTP routes are org-scoped via `:orgId`. Gateways do their own
+    // membership checks when a client subscribes to an org room.
+    if (context.getType() !== 'http') return true;
+
     const required = this.reflector.getAllAndOverride<OrgRole[] | undefined>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),

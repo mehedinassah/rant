@@ -28,6 +28,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   override canActivate(context: ExecutionContext) {
+    // WebSocket gateways authenticate the handshake themselves (see
+    // RealtimeGateway), so the HTTP guard must not run for them.
+    if (context.getType() !== 'http') return true;
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),

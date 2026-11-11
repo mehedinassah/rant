@@ -450,6 +450,69 @@ export const github = {
     api<{ linked: boolean }>(`/integrations/github/account`, { method: 'DELETE' }),
 };
 
+export type IntegrationProvider = 'VERCEL' | 'SENTRY';
+
+export interface IntegrationStatus {
+  provider: string;
+  enabled: boolean;
+  configured: boolean;
+  teamId?: string | null;
+  webhookPath: string;
+  linkedProjects: number;
+  deliveries: number;
+}
+
+export interface IntegrationLink {
+  id: string;
+  provider: IntegrationProvider;
+  externalProjectId: string;
+  externalProjectName?: string | null;
+  repositoryId: string;
+  environmentId?: string | null;
+  createdAt: string;
+  repository?: { id: string; name: string; slug: string; defaultBranch: string } | null;
+  environment?: { id: string; name: string; slug: string; type: string } | null;
+}
+
+export interface IntegrationDelivery {
+  id: string;
+  provider: IntegrationProvider;
+  deliveryId: string;
+  event: string;
+  receivedAt: string;
+}
+
+const integrationBase = (orgId: string, provider: string) =>
+  `/organizations/${orgId}/integrations/${provider}`;
+
+function integrationApi(provider: 'vercel' | 'sentry') {
+  const base = (orgId: string) => integrationBase(orgId, provider);
+  return {
+    status: (orgId: string) => api<IntegrationStatus>(`${base(orgId)}/status`),
+    links: (orgId: string) => api<IntegrationLink[]>(`${base(orgId)}/links`),
+    createLink: (
+      orgId: string,
+      data: {
+        externalProjectId: string;
+        externalProjectName?: string;
+        repositoryId: string;
+        environmentId?: string;
+      },
+    ) =>
+      api<IntegrationLink>(`${base(orgId)}/links`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    removeLink: (orgId: string, linkId: string) =>
+      api<{ success: boolean }>(`${base(orgId)}/links/${linkId}`, { method: 'DELETE' }),
+  };
+}
+
+/** Vercel: real deployments land in rant (and retarget monitoring). */
+export const vercel = integrationApi('vercel');
+/** Sentry: real issues open/resolve rant incidents. */
+export const sentry = integrationApi('sentry');
+
 export const repositories = {
   list: (orgId: string) => api<Repository[]>(`/organizations/${orgId}/repositories`),
   get: (orgId: string, repoId: string) => api<Repository>(repoBase(orgId, repoId)),

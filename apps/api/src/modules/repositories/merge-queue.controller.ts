@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { OrgRole } from '@rant/database';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -14,6 +14,7 @@ export class MergeQueueController {
   }
 
   @Roles(OrgRole.DEVOPS, OrgRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
   @Post('process')
   process(
     @Param('orgId') orgId: string,

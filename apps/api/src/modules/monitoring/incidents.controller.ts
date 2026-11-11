@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { OrgRole } from '@rant/database';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -30,6 +30,7 @@ export class IncidentsController {
   }
 
   @Roles(OrgRole.DEVOPS, OrgRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
   @Post(':incidentId/acknowledge')
   acknowledge(
     @Param('orgId') orgId: string,
@@ -41,6 +42,7 @@ export class IncidentsController {
   }
 
   @Roles(OrgRole.DEVOPS, OrgRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
   @Post(':incidentId/resolve')
   resolve(
     @Param('orgId') orgId: string,

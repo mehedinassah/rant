@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   MembershipStatus,
   NotificationType,
@@ -7,6 +8,10 @@ import {
 } from '@rant/database';
 import { interval, map, Observable, startWith, switchMap } from 'rxjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import {
+  NotificationCreatedPayload,
+  RealtimeEvent,
+} from '../../common/events/realtime-events';
 import { ALL_CATEGORIES, NOTIFICATION_META } from './notifications.constants';
 import { PreferenceDto } from './dto/notification.dto';
 
@@ -26,7 +31,10 @@ export interface NotifyInput {
 export class NotificationsService {
   private readonly logger = new Logger('Notifications');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   // ── Delivery (called by listeners) ─────────────────────────
 
@@ -86,6 +94,17 @@ export class NotificationsService {
     if (rows.length === 0) return 0;
     await this.prisma.notification.createMany({ data: rows });
     this.logger.log(`🔔 ${input.type} → ${rows.length} recipient(s)`);
+
+    // Realtime bell: one targeted event per recipient (no cross-tenant leak).
+    for (const row of rows) {
+      this.events.emit(RealtimeEvent.NotificationCreated, {
+        userId: row.userId,
+        organizationId: row.organizationId ?? null,
+        type: row.type,
+        title: row.title,
+        linkPath: row.linkPath ?? null,
+      } satisfies NotificationCreatedPayload);
+    }
     return rows.length;
   }
 

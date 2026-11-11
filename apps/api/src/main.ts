@@ -1,15 +1,16 @@
+// Must be first: installs OTel instrumentation before Nest/Express load.
+import './common/telemetry/tracing';
 import 'reflect-metadata';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { configureApp } from './app.setup';
 
 async function bootstrap() {
-  // rawBody lets the GitHub webhook controller read the exact bytes GitHub
-  // signed, so HMAC verification matches (JSON re-serialization would differ).
+  // rawBody lets the webhook controllers read the exact bytes the provider
+  // signed (GitHub/Vercel/Sentry), so HMAC verification matches the payload.
   const app = await NestFactory.create(AppModule, { cors: true, rawBody: true });
   const config = app.get(ConfigService);
 
@@ -22,18 +23,7 @@ async function bootstrap() {
     }),
   );
 
-  app.setGlobalPrefix('api');
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
-  app.useGlobalFilters(new HttpExceptionFilter());
+  configureApp(app);
 
   // Self-documenting OpenAPI at /docs — both auth schemes are advertised.
   const swaggerConfig = new DocumentBuilder()

@@ -16,5 +16,6 @@ import { MonitoringListeners } from './monitoring.listeners';
     MonitoringScheduler,
     MonitoringListeners,
   ],
+  exports: [IncidentsService],
 })
 export class MonitoringModule {}

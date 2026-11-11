@@ -38,6 +38,13 @@ system.
 > the team's activity channel**, and **fires a signed webhook** to external
 > systems — the whole loop from an idea to a live URL to an observed outage to
 > everyone (and everything) that needs to know, inside one system.
+>
+> The loop now runs on **real data**, not just simulations: a **GitHub App**
+> syncs repos/commits/PRs/Actions runs, **Vercel** webhooks turn real deployments
+> into rant deployments (retargeting monitoring), and **Sentry** webhooks turn
+> real production errors into rant incidents (with bug issue, postmortem, chat
+> and notifications). A **Socket.IO** gateway pushes the bus to connected UIs,
+> and **OpenTelemetry** tracing is one env var away.
 
 ---
 
@@ -80,12 +87,21 @@ conversation. A commit → a CI run → a
 deployment → a monitored URL → an incident → a bug → a notification → a webhook
 is one chain of events, each hop reacting to the last.
 
+Real integrations attach at the edges of that chain without changing it: a
+**GitHub App** maps real pushes/PRs/Actions runs, a **Vercel** webhook maps real
+deployments, and a **Sentry** webhook maps real issues — each verifies the
+provider signature, dedupes the delivery, enqueues a BullMQ job, and then
+**re-emits the same domain events** the simulated modules emit. A **Realtime
+bridge** republishes the bus over a Socket.IO gateway (`/realtime`, JWT-authed,
+membership-checked rooms), complementing the SSE streams, and **OpenTelemetry**
+instruments HTTP/handlers/DB when `OTEL_ENABLED=true`.
+
 ## Tech stack
 
 Next.js 15 · NestJS 10 · Prisma 6 · PostgreSQL · Redis · BullMQ (queue + worker) ·
-Server-Sent Events · in-process scheduler · OpenAPI/Swagger · Turborepo · pnpm ·
-TypeScript · argon2 · JWT (access + rotating refresh tokens) · API keys +
-HMAC-signed webhooks.
+Server-Sent Events · Socket.IO · OpenTelemetry · in-process scheduler ·
+OpenAPI/Swagger · Turborepo · pnpm · TypeScript · argon2 · JWT (access + rotating
+refresh tokens) · API keys + HMAC-signed webhooks.
 
 ## Prerequisites
 
@@ -142,6 +158,9 @@ database is provisioned automatically.
 | `pnpm build`        | Build every package/app                      |
 | `pnpm typecheck`    | Typecheck the whole repo                     |
 | `pnpm test`         | Run the unit test suite                      |
+| `pnpm test:e2e`     | Run the e2e suite (needs Postgres + Redis)   |
+| `pnpm sqa`          | Full API SQA against a running stack         |
+| `pnpm sqa:ui`       | Browser-level SQA + screenshots              |
 | `pnpm db:migrate`   | Create + apply a new migration (dev)         |
 | `pnpm db:migrate:deploy` | Apply pending migrations (prod/CI)      |
 | `pnpm db:push`      | Fast schema sync, no migration (prototyping) |
@@ -162,12 +181,48 @@ should ship as a migration (`pnpm db:migrate --name <change>`).
 
 ## Testing & CI
 
-The API ships a Jest unit suite for its pure logic (`pnpm test`) — API-key
-hashing, pagination clamping, the CI/deploy simulation predicates, and the
-copilot's intent classifier. A **GitHub Actions** workflow
-(`.github/workflows/ci.yml`) runs `install → prisma generate → typecheck → test →
-build` on every push and pull request. Each module was additionally verified
-end-to-end during development with throwaway smoke scripts against a live server.
+The repo ships two layers of tests:
+
+- **Unit** (`pnpm test`) — pure logic with no DB: API-key hashing, pagination
+  clamping, the CI/deploy simulation predicates, the copilot's intent classifier,
+  and the integration mappers, signature verification and dedupe for GitHub,
+  Vercel and Sentry.
+- **E2E / integration** (`pnpm test:e2e`) — boots the real `AppModule` against
+  Postgres + Redis and drives it over HTTP with supertest: register → org →
+  workspace → project → issue → comment → audit; RBAC tenant isolation; billing;
+  signed **Vercel** and **Sentry** webhooks passing through BullMQ workers into
+  deployments/incidents (and the notification, chat, bug-issue and postmortem
+  ripple); and an authenticated **Socket.IO** subscriber receiving
+  `incident.opened`.
+
+A **GitHub Actions** workflow (`.github/workflows/ci.yml`) runs `install → prisma
+generate → typecheck → unit tests → migrate deploy → e2e → build` on every push
+and pull request, with Postgres 16 + Redis 7 service containers.
+
+Locally, the e2e suite truncates every table, so point it at a throwaway database:
+
+```bash
+docker compose up -d
+docker exec rant-postgres psql -U rant -d postgres -c 'CREATE DATABASE rant_e2e'
+DATABASE_URL='postgresql://rant:rant@localhost:5432/rant_e2e?schema=public' pnpm test:e2e
+```
+
+The e2e harness uses Redis database **1** (`REDIS_URL` supports `/1`) so it never
+competes with a running dev stack's BullMQ workers on database 0.
+
+### SQA
+
+Two black-box suites exist for manual verification against a running stack:
+
+- `pnpm sqa` — creates a throwaway **SQA Corp** org and exercises every module
+  end to end: auth, planning, RBAC, billing limits, repos/commits/PRs/merge
+  queue, CI → deploy → monitor → incident → bug → postmortem → notifications →
+  chat → signed webhook ripple, Vercel/Sentry ingestion, Socket.IO, docs/search/
+  copilot/files/API keys/analytics/audit, and all UI routes.
+- `pnpm sqa:ui` — drives a headless browser through the real login form and key
+  screens, asserts rendered content, and captures screenshots.
+
+The latest run and defect log live in [docs/sqa-report.md](docs/sqa-report.md).
 
 The API is hardened with **helmet** (security headers) and **rate limiting**
 (`@nestjs/throttler`: 120 req/min per IP, 10/min on auth), and list endpoints
@@ -204,6 +259,27 @@ incident, posts to `#activity` and notifies the team through the same ripple as
 the simulated modules. See the [design spec](docs/github-integration.md) and the
 [setup walkthrough](docs/github-setup.md). Disabled until a GitHub App is configured
 (`FEATURE_GITHUB` / `GITHUB_*` env).
+
+**Vercel integration** — `POST /integrations/vercel/webhook` (public, HMAC-signed) ·
+`GET /organizations/:orgId/integrations/vercel/status|links|deliveries` ·
+`POST|DELETE /organizations/:orgId/integrations/vercel/links[/:linkId]` (ADMIN).
+A webhook delivery is verified (`x-vercel-signature`), deduped by `x-vercel-id`
+and enqueued; the worker maps `deployment.created|ready|error|canceled` onto a
+rant `Deployment` (with `source = VERCEL` and the provider id), sets the
+environment's live deployment on success and **emits `deployment.completed`** —
+so monitoring retargets the real URL and the notification/chat/webhook ripple
+fires. Disabled until `VERCEL_WEBHOOK_SECRET` is set (`FEATURE_VERCEL`).
+See the [deploy-monitor spec](docs/deploy-monitor-integrations.md).
+
+**Sentry integration** — `POST /integrations/sentry/webhook` (public, HMAC-signed) ·
+`GET /organizations/:orgId/integrations/sentry/status|links|deliveries` ·
+`POST|DELETE /organizations/:orgId/integrations/sentry/links[/:linkId]` (ADMIN).
+Sentry issue events (`created`, `resolved`, `unresolved`) are verified
+(`sentry-hook-signature`), deduped, enqueued and mapped onto a rant `Incident`
+(`source = SENTRY`): opening files a bug on the linked project and emits
+`incident.opened` (a `CRITICAL` issue also drafts a postmortem doc), resolving
+closes the incident and its bug and emits `incident.resolved`. Disabled until
+`SENTRY_WEBHOOK_SECRET` is set (`FEATURE_SENTRY`).
 
 **Workspaces** — `GET|POST /organizations/:orgId/workspaces` ·
 `GET|PATCH|DELETE /organizations/:orgId/workspaces/:workspaceId`
@@ -295,6 +371,14 @@ consumer of the event bus: a failed CI run, a deploy, an opened/resolved
 incident and a new pull request each fan out to the relevant members' feed
 (by org role), respecting per-category in-app/email preferences. Email is a
 logged stub until a real provider is wired up.
+
+**Realtime** — Socket.IO namespace `/realtime` (not REST). The handshake carries
+the JWT access token; a client joins `subscribe:org` / `subscribe:channel` rooms,
+each re-checking active membership, and receives `notification.created` (its user
+room) plus `commit.created`, `pull_request.opened`, `pipeline_run.completed`,
+`deployment.completed`, `incident.opened|resolved` and `chat.message` for the
+rooms it joined. The SSE streams remain available as a one-way fallback; the
+gateway is what makes the notification bell and open chat thread update instantly.
 
 **Documentation** — `GET|POST .../workspaces/:workspaceId/docs` (page tree) ·
 `GET|PATCH|DELETE .../docs/:docId` · `GET .../docs/:docId/revisions` ·
@@ -391,7 +475,20 @@ extensible without code changes:
   (Postgres blobs → S3/R2 with presigned URLs), and **billing** (simulated →
   real Stripe Checkout + webhooks).
 
-What remains is mostly external-service wiring and depth: broadening the
-real-integration pattern to deploys/monitoring (Vercel/Sentry — same
-webhook-ingestion shape as GitHub), integration + e2e test coverage, WebSockets
-for richer real-time, and OpenTelemetry for observing rant itself.
+The integration pass now covers all three edges of the loop:
+
+- **GitHub** — repos/commits/PRs/reviews/Actions runs ([spec](docs/github-integration.md)).
+- **Vercel** — real deployments into the existing Deployment model, retargeting
+  monitoring ([spec](docs/deploy-monitor-integrations.md)).
+- **Sentry** — real issues into the existing Incident model, driving the bug,
+  postmortem, chat and notification ripple.
+- **Real-time** — a JWT-authenticated Socket.IO gateway + event-bus bridge.
+- **Observability** — opt-in OpenTelemetry (HTTP + per-handler spans).
+- **Tests** — a real Postgres/Redis e2e suite wired into CI, covering the core
+  flow, RBAC isolation, both new webhooks and the socket push.
+
+What remains is depth rather than missing modules: provider backfill (listing
+Vercel/Sentry projects via their APIs instead of linking by id), presence/typing
+over the gateway, replacing the remaining SSE polls entirely, load/chaos testing
+of the webhook workers, and shipping OTel metrics + log correlation with a
+collector in the compose stack.

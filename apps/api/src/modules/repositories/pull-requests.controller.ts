@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -91,6 +93,7 @@ export class PullRequestsController {
   // ── Merge + queue ─────────────────────────────────────────
 
   @Roles(OrgRole.DEVOPS, OrgRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
   @Post(':number/merge')
   merge(
     @Param('orgId') orgId: string,

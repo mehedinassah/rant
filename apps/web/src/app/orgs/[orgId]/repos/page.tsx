@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { organizations, repositories, type Organization, type Repository } from '@/lib/api';
+import {
+  organizations,
+  projects as projectsApi,
+  repositories,
+  workspaces as workspacesApi,
+  type Organization,
+  type Project,
+  type Repository,
+} from '@/lib/api';
 import { useRequireAuth } from '@/lib/use-require-auth';
 
 export default function ReposPage() {
@@ -14,13 +22,23 @@ export default function ReposPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [o, r] = await Promise.all([organizations.get(orgId), repositories.list(orgId)]);
+      const [o, r, workspaces] = await Promise.all([
+        organizations.get(orgId),
+        repositories.list(orgId),
+        workspacesApi.list(orgId),
+      ]);
       setOrg(o);
       setRepos(r);
+      const perWorkspace = await Promise.all(
+        workspaces.map((w) => projectsApi.list(orgId, w.id)),
+      );
+      setProjects(perWorkspace.flat());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
@@ -37,8 +55,13 @@ export default function ReposPage() {
     setError(null);
     try {
       const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      await repositories.create(orgId, { name, slug });
+      await repositories.create(orgId, {
+        name,
+        slug,
+        ...(projectId ? { projectId } : {}),
+      });
       setName('');
+      setProjectId('');
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create repository');
@@ -55,18 +78,34 @@ export default function ReposPage() {
       <h1 className="mt-3 text-2xl font-semibold">Repositories</h1>
       <p className="text-sm text-white/40">Source, pull requests and CI/CD pipelines.</p>
 
-      <form onSubmit={createRepo} className="mt-8 flex gap-3">
+      <form onSubmit={createRepo} className="mt-8 flex flex-wrap gap-3">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="New repository name"
           required
-          className="flex-1 rounded-lg border border-white/10 bg-[var(--color-ink-soft)] px-3 py-2 outline-none focus:border-[var(--color-accent)]"
+          className="min-w-[220px] flex-1 rounded-lg border border-white/10 bg-[var(--color-ink-soft)] px-3 py-2 outline-none focus:border-[var(--color-accent)]"
         />
+        <select
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          className="rounded-lg border border-white/10 bg-[var(--color-ink-soft)] px-3 py-2 text-sm text-white/80 outline-none focus:border-[var(--color-accent)]"
+          aria-label="Link repository to a project"
+        >
+          <option value="">No linked project</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.key} · {p.name}
+            </option>
+          ))}
+        </select>
         <button className="rounded-lg bg-[var(--color-accent)] px-4 py-2 font-medium text-white hover:opacity-90">
           Create repository
         </button>
       </form>
+      <p className="mt-2 text-xs text-white/35">
+        Linking a project lets monitoring incidents auto-file a bug and draft a postmortem.
+      </p>
 
       {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
 

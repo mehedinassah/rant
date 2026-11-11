@@ -11,9 +11,10 @@ const standalone = process.env.NEXT_OUTPUT === 'standalone';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  ...(standalone
-    ? { output: 'standalone', outputFileTracingRoot: path.join(dirname, '../../') }
-    : {}),
+  // Pin the monorepo root so Next doesn't infer it from an unrelated lockfile
+  // higher up the filesystem (also required for correct standalone tracing).
+  outputFileTracingRoot: path.join(dirname, '../../'),
+  ...(standalone ? { output: 'standalone' } : {}),
 };
 
 export default nextConfig;

@@ -7,13 +7,40 @@ on:
 
 jobs:
   verify:
-    name: typecheck · test · build
+    name: typecheck · unit · e2e · build
     runs-on: ubuntu-latest
     env:
-      # Prisma only needs these to be present for `generate`/typecheck — no DB is
-      # contacted in CI.
-      DATABASE_URL: postgresql://user:pass@localhost:5432/rant
+      # Prisma only needs these for `generate`/typecheck against a DB-free step;
+      # the e2e job below points at the service containers.
+      DATABASE_URL: postgresql://rant:rant@localhost:5432/rant_test?schema=public
       REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: rant
+          POSTGRES_PASSWORD: rant
+          POSTGRES_DB: rant_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rant -d rant_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +65,12 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+      - name: Apply migrations to the e2e database
+        run: pnpm db:migrate:deploy
+
+      - name: E2E + integration tests
+        run: pnpm test:e2e
 
       - name: Build
         run: pnpm build

@@ -11,6 +11,13 @@ import {
   type ChatMessage,
 } from '@/lib/api';
 import { useRequireAuth } from '@/lib/use-require-auth';
+import {
+  joinChannel,
+  joinOrg,
+  leaveChannel,
+  onRealtime,
+  type ChatMessageEvent,
+} from '@/lib/realtime';
 
 function timeShort(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -51,6 +58,27 @@ export default function ChatPage() {
     stopRef.current = streamChannel(orgId, activeId, setMessages);
     return () => stopRef.current?.();
   }, [ready, orgId, activeId]);
+
+  // Socket push makes new messages appear instantly (SSE above is the fallback).
+  useEffect(() => {
+    if (!ready) return;
+    joinOrg(orgId);
+  }, [ready, orgId]);
+
+  useEffect(() => {
+    if (!ready || !activeId) return;
+    joinChannel(activeId);
+    const stop = onRealtime<ChatMessageEvent>('chat.message', (event) => {
+      if (event.channelId !== activeId) return;
+      setMessages((prev) =>
+        prev.some((m) => m.id === event.message.id) ? prev : [...prev, event.message],
+      );
+    });
+    return () => {
+      stop();
+      leaveChannel(activeId);
+    };
+  }, [ready, activeId]);
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });

@@ -306,5 +306,6 @@ polish.
 
 ## Explicitly out of scope (later)
 Writing back to GitHub (creating PRs/commits from rant), GitLab/Bitbucket providers
-(same mapper pattern), Checks API status *from* rant, and replacing simulated deploy/
-monitor modules (separate specs, same webhook-ingestion shape).
+(same mapper pattern), Checks API status *from* rant. Replacing the simulated
+deploy/monitor modules was completed separately with Vercel and Sentry — see
+[`deploy-monitor-integrations.md`](deploy-monitor-integrations.md).

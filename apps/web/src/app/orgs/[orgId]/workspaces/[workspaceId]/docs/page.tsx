@@ -314,7 +314,7 @@ function DocsInner() {
                 <p className="mt-6 text-white/30">This page is empty. Click Edit to add content.</p>
               ) : (
                 <div
-                  className="mt-6 text-sm text-white/80"
+                  className="doc-prose mt-6 text-sm text-white/80"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(doc.content) }}
                 />
               )}

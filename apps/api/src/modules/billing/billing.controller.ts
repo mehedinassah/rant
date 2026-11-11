@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { OrgRole } from '@rant/database';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -53,12 +53,14 @@ export class BillingController {
   }
 
   @Roles(OrgRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
   @Post('subscription/cancel')
   cancel(@Param('orgId') orgId: string, @CurrentUser('userId') userId: string) {
     return this.billing.cancel(orgId, userId);
   }
 
   @Roles(OrgRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
   @Post('subscription/resume')
   resume(@Param('orgId') orgId: string, @CurrentUser('userId') userId: string) {
     return this.billing.resume(orgId, userId);

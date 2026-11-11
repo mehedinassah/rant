@@ -7,25 +7,23 @@ import {
   IssueStatus,
   IssuePriority,
 } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
-// NOTE: the API hashes passwords with argon2. For seed convenience we only
-// need a deterministic placeholder; the seeded user is meant for local demos.
-// Log in via the register endpoint to get a real argon2 hash.
-function placeholderHash(input: string): string {
-  return 'seed$' + createHash('sha256').update(input).digest('hex');
-}
+/** Demo password for the seeded owner — hashed the same way the API verifies it. */
+const DEMO_PASSWORD = 'password123';
 
 async function main() {
+  const passwordHash = await argon2.hash(DEMO_PASSWORD);
   const owner = await prisma.user.upsert({
     where: { email: 'founder@rant.dev' },
-    update: {},
+    // Re-seeding repairs a previously placeholder hash so login keeps working.
+    update: { passwordHash },
     create: {
       email: 'founder@rant.dev',
       name: 'Rant Founder',
-      passwordHash: placeholderHash('password123'),
+      passwordHash,
       emailVerifiedAt: new Date(),
     },
   });
@@ -118,7 +116,7 @@ async function main() {
   }
 
   console.log('✅ Seed complete:');
-  console.log(`   owner:     ${owner.email}`);
+  console.log(`   owner:     ${owner.email} / ${DEMO_PASSWORD}`);
   console.log(`   org:       ${org.slug}`);
   console.log(`   workspace: ${workspace.slug}`);
   console.log(`   project:   ${project.key} (with sprint, epic, issues)`);

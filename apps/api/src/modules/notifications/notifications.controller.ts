@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Sse } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+  Sse,
+} from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { NotificationsService } from './notifications.service';
@@ -38,11 +50,13 @@ export class NotificationsController {
     return this.notifications.stream(userId);
   }
 
+  @HttpCode(HttpStatus.OK)
   @Post('read-all')
   markAllRead(@CurrentUser('userId') userId: string) {
     return this.notifications.markAllRead(userId);
   }
 
+  @HttpCode(HttpStatus.OK)
   @Post(':id/read')
   markRead(@CurrentUser('userId') userId: string, @Param('id') id: string) {
     return this.notifications.markRead(userId, id);

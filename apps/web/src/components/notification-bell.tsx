@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getAccessToken, streamNotifications } from '@/lib/api';
+import { connectRealtime, onRealtime, type NotificationCreatedEvent } from '@/lib/realtime';
 
 /**
- * A bell that links to the notification center and keeps its unread badge live
- * via the notifications SSE stream. Renders nothing until authenticated.
+ * A bell that links to the notification center and keeps its unread badge live.
+ * The Socket.IO push makes it instant; the SSE stream remains a fallback for
+ * environments where WebSockets are blocked by a proxy.
  */
 export function NotificationBell() {
   const [unread, setUnread] = useState(0);
@@ -15,8 +17,15 @@ export function NotificationBell() {
   useEffect(() => {
     if (!getAccessToken()) return;
     setAuthed(true);
+    connectRealtime();
     const stop = streamNotifications((snap) => setUnread(snap.unread));
-    return () => stop();
+    const stopRealtime = onRealtime<NotificationCreatedEvent>('notification.created', () => {
+      setUnread((n) => n + 1);
+    });
+    return () => {
+      stop();
+      stopRealtime();
+    };
   }, []);
 
   if (!authed) return null;

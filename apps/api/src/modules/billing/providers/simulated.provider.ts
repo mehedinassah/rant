@@ -12,7 +12,7 @@ export class SimulatedBillingProvider implements BillingProvider {
     return { url: input.successUrl, applyImmediately: true };
   }
 
-  async parseWebhook(): Promise<BillingEvent> {
+  async parseWebhook(_payload?: Buffer, _signature?: string): Promise<BillingEvent> {
     return null; // no external webhooks in simulated mode
   }
 }

@@ -13,6 +13,10 @@ export class CreateSprintDto {
   goal?: string;
 
   @IsOptional()
+  @IsEnum(SprintStatus)
+  status?: SprintStatus;
+
+  @IsOptional()
   @IsISO8601()
   startDate?: string;
 

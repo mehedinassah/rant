@@ -6,6 +6,7 @@ import {
   IssuePriority,
   IssueStatus,
   IssueType,
+  RecordSource,
 } from '@rant/database';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
@@ -81,7 +82,7 @@ export class IncidentsService {
     // Ripple: a real (non-preview) outage opens a bug on the linked project.
     let issueId: string | null = null;
     if (repo.projectId) {
-      issueId = await this.openBugIssue(repo.organizationId, repo.projectId, title, summary, severity);
+      issueId = await this.fileBugIssue(repo.organizationId, repo.projectId, title, summary, severity);
     }
 
     const incident = await this.prisma.incident.create({
@@ -119,7 +120,17 @@ export class IncidentsService {
 
   /** Auto-close the open incident for a monitor that has recovered. */
   async resolveIncidentFor(ctx: MonitorContext): Promise<void> {
-    const id = await this.openIncidentId(ctx.id);
+    // Only resolve incidents this probe opened. Externally-sourced incidents
+    // (e.g. Sentry) are owned by the provider and close when Sentry says so.
+    const existing = await this.prisma.incident.findFirst({
+      where: {
+        monitorId: ctx.id,
+        status: { in: [IncidentStatus.OPEN, IncidentStatus.ACKNOWLEDGED] },
+        source: RecordSource.NATIVE,
+      },
+      select: { id: true },
+    });
+    const id = existing?.id ?? null;
     if (!id) return;
 
     const incident = await this.prisma.incident.update({
@@ -155,7 +166,7 @@ export class IncidentsService {
   }
 
   /** Mint a BUG issue on the linked project, reported by the org owner. */
-  private async openBugIssue(
+  async fileBugIssue(
     orgId: string,
     projectId: string,
     title: string,

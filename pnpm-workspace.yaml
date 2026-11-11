@@ -11,6 +11,7 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: false
   prisma: true
+  protobufjs: true
   sharp: true
   unrs-resolver: false
 
@@ -21,4 +22,5 @@ onlyBuiltDependencies:
   - argon2
   - esbuild
   - prisma
+  - protobufjs
   - sharp

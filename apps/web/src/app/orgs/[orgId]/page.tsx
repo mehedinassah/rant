@@ -64,96 +64,118 @@ export default function OrgPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
+      <div className="mb-6 flex items-center justify-between border-b-2 border-white/20 pb-3">
+        <p className="brutal-kicker">rant // organization</p>
+        <span className="brutal-stamp">LIVE</span>
+      </div>
+
       <div className="flex items-start justify-between gap-4">
-        <Link href="/dashboard" className="shrink-0 text-sm text-white/50 hover:text-white">
+        <Link
+          href="/dashboard"
+          className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/50 hover:text-white"
+        >
           ← All organizations
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             href={`/orgs/${orgId}/chat`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             💬 Chat
           </Link>
           <Link
             href={`/orgs/${orgId}/copilot`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             ✨ Copilot
           </Link>
           <Link
             href={`/orgs/${orgId}/analytics`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             📊 Analytics
           </Link>
           <Link
             href={`/orgs/${orgId}/search`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             🔍 Search
           </Link>
           <Link
             href={`/orgs/${orgId}/api`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             ⚙ API
           </Link>
           <Link
             href={`/orgs/${orgId}/billing`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             💳 Billing
           </Link>
           <Link
             href={`/orgs/${orgId}/files`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             📎 Files
           </Link>
           <Link
             href={`/orgs/${orgId}/audit`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             🧾 Audit
           </Link>
           <Link
             href={`/orgs/${orgId}/members`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             👥 Members
           </Link>
           <Link
             href={`/orgs/${orgId}/integrations`}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+            className="inline-flex items-center gap-2 border border-white/10 px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
           >
             🔗 Integrations
           </Link>
           <NotificationBell />
         </div>
       </div>
-      <h1 className="mt-3 text-2xl font-semibold">{org?.name ?? 'Organization'}</h1>
-      <p className="text-sm text-white/40">/{org?.slug}</p>
+      <h1 className="mt-5 text-4xl sm:text-5xl">{org?.name ?? 'Organization'}</h1>
+      <p className="mt-1 font-mono text-xs uppercase tracking-[0.2em] text-white/40">
+        /{org?.slug}
+      </p>
 
-      <nav className="mt-5 flex gap-2">
-        <span className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium">Projects</span>
+      <nav className="mt-6 flex flex-wrap gap-2">
+        <span className="border-2 border-[var(--color-accent)] bg-[var(--color-accent)] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black">
+          Projects
+        </span>
         <Link
           href={`/orgs/${orgId}/repos`}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white"
+          className="border-2 border-white/20 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/60 hover:border-white/50 hover:text-white"
         >
           Repositories &amp; CI
         </Link>
       </nav>
 
-      <form onSubmit={createWorkspace} className="mt-8 flex gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-3 border-y-2 border-white/20 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+        <span className="text-[var(--color-accent)]">● System nominal</span>
+        <span aria-hidden>/</span>
+        <span>{items.length} workspace(s)</span>
+        <span aria-hidden>/</span>
+        <span>{items.reduce((sum, ws) => sum + ws.projects.length, 0)} project(s)</span>
+        <span aria-hidden>/</span>
+        <span>RBAC + audit on</span>
+      </div>
+
+      <form onSubmit={createWorkspace} className="mt-8 flex flex-wrap gap-3">
         <input
           value={wsName}
           onChange={(e) => setWsName(e.target.value)}
           placeholder="New workspace name"
           required
-          className="flex-1 rounded-lg border border-white/10 bg-[var(--color-ink-soft)] px-3 py-2 outline-none focus:border-[var(--color-accent)]"
+          className="min-w-[220px] flex-1 px-3 py-2"
         />
-        <button className="rounded-lg bg-[var(--color-accent)] px-4 py-2 font-medium text-white hover:opacity-90">
+        <button className="bg-[var(--color-accent)] px-4 py-2 font-medium text-white">
           Add workspace
         </button>
       </form>

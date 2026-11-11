@@ -1,0 +1,19 @@
+{
+  "action": "created",
+  "installation": { "uuid": "0f0f0f0f-1111-2222-3333-444455556666" },
+  "data": {
+    "issue": {
+      "id": "5566778899",
+      "title": "TypeError: Cannot read properties of undefined",
+      "culprit": "src/checkout/handler.ts in processOrder",
+      "level": "error",
+      "status": "unresolved",
+      "permalink": "https://acme.sentry.io/issues/5566778899/",
+      "firstSeen": "2026-07-28T09:58:00Z",
+      "lastSeen": "2026-07-28T10:02:00Z",
+      "project": { "id": "4500000000000001", "slug": "checkout-web", "name": "checkout-web" },
+      "metadata": { "type": "TypeError", "value": "Cannot read properties of undefined" }
+    }
+  },
+  "resource": "issue"
+}

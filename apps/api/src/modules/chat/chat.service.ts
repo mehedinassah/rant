@@ -1,7 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ChatMessageKind } from '@rant/database';
 import { interval, map, Observable, startWith, switchMap } from 'rxjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import {
+  ChatMessageCreatedPayload,
+  RealtimeEvent,
+} from '../../common/events/realtime-events';
 import { CreateChannelDto } from './dto/chat.dto';
 
 const AUTHOR_SELECT = { select: { id: true, name: true, avatarUrl: true } };
@@ -9,7 +14,10 @@ const SYSTEM_CHANNEL = 'activity';
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   /** Ensures an org has its default #general and system #activity channels. */
   private async ensureDefaults(orgId: string): Promise<void> {
@@ -62,10 +70,12 @@ export class ChatService {
 
   async postMessage(orgId: string, channelId: string, authorId: string, body: string) {
     await this.assertChannel(orgId, channelId);
-    return this.prisma.chatMessage.create({
+    const message = await this.prisma.chatMessage.create({
       data: { channelId, authorId, kind: ChatMessageKind.USER, body },
       include: { author: AUTHOR_SELECT },
     });
+    this.publish(orgId, channelId, message);
+    return message;
   }
 
   /** Integration hook: post a SYSTEM message into the org's activity channel. */
@@ -76,9 +86,19 @@ export class ChatService {
       select: { id: true },
     });
     if (!channel) return;
-    await this.prisma.chatMessage.create({
+    const message = await this.prisma.chatMessage.create({
       data: { channelId: channel.id, kind: ChatMessageKind.SYSTEM, body },
     });
+    this.publish(orgId, channel.id, message);
+  }
+
+  /** Fan a new message out to the realtime gateway via the event bus. */
+  private publish(orgId: string, channelId: string, message: unknown): void {
+    this.events.emit(RealtimeEvent.ChatMessageCreated, {
+      orgId,
+      channelId,
+      message,
+    } satisfies ChatMessageCreatedPayload);
   }
 
   /** SSE: emit the channel's latest messages every 2s for a live thread. */

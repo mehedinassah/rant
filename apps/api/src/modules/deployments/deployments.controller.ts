@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Sse } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Param, Post, Sse } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { OrgRole } from '@rant/database';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -34,6 +34,7 @@ export class DeploymentsController {
   }
 
   @Roles(OrgRole.DEVOPS, OrgRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
   @Post(':deploymentId/cancel')
   cancel(
     @Param('orgId') orgId: string,

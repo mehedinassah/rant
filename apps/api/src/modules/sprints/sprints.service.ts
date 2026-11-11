@@ -34,6 +34,7 @@ export class SprintsService {
         projectId: scope.projectId,
         name: dto.name,
         goal: dto.goal,
+        status: dto.status,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
       },

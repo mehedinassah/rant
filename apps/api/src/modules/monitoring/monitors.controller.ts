@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -67,6 +69,7 @@ export class MonitorsController {
 
   /** Inject or clear a simulated outage (demoes the incident flow). */
   @Roles(OrgRole.DEVOPS, OrgRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
   @Post(':monitorId/simulate')
   simulate(
     @Param('orgId') orgId: string,

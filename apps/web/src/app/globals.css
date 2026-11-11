@@ -1,18 +1,326 @@
 @import 'tailwindcss';
 
+/* ─────────────────────────────────────────────────────────────
+   BRUTALIST / "RIOT TERMINAL" DESIGN SYSTEM
+   Paper-black canvas · cream ink · acid-lime CTA · safety-orange
+   accents · 2px rules · zero radius · hard offset shadows.
+   ───────────────────────────────────────────────────────────── */
+
 @theme {
-  --color-ink: #0a0a0f;
-  --color-ink-soft: #12121a;
-  --color-accent: #6d5efc;
-  --color-accent-soft: #a99bff;
+  --color-ink: #080807;
+  --color-ink-soft: #101010;
+  --color-accent: #d7ff3f;
+  --color-accent-soft: #eaffa3;
+  --color-paper: #f2eee3;
+  --color-hot: #ff5c00;
+  --color-white: #f2eee3;
+
+  --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 }
 
-html {
+:root {
+  --brutal-paper: #f2eee3;
+  --brutal-line: rgba(242, 238, 227, 0.28);
+  --brutal-line-strong: #f2eee3;
+  --brutal-lime: #d7ff3f;
+  --brutal-hot: #ff5c00;
+  --brutal-shadow: rgba(242, 238, 227, 0.16);
   color-scheme: dark;
 }
 
-body {
+html {
   background: var(--color-ink);
-  color: #e8e8ef;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--color-ink);
+  background-image:
+    linear-gradient(to right, rgba(242, 238, 227, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(242, 238, 227, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--brutal-paper);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--brutal-lime);
+  color: #080807;
+}
+
+/* Square everything. Brutalism has no soft corners. */
+.rounded,
+.rounded-sm,
+.rounded-md,
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl,
+.rounded-3xl,
+.rounded-full {
+  border-radius: 0 !important;
+}
+
+/* Structural rules: any real border becomes a 2px cream rule. */
+[class~='border'][class*='border-white/'] {
+  border-width: 2px !important;
+  border-color: var(--brutal-line) !important;
+}
+
+/* Panels get hard offset shadows instead of soft elevation. */
+div[class*='bg-[var(--color-ink-soft)]'],
+section[class*='bg-[var(--color-ink-soft)]'],
+aside[class*='bg-[var(--color-ink-soft)]'],
+li[class*='bg-[var(--color-ink-soft)]'] {
+  border: 2px solid var(--brutal-line);
+  box-shadow: 5px 5px 0 var(--brutal-shadow);
+}
+
+div[class*='bg-[var(--color-ink)]'],
+div[class*='cursor-pointer'] {
+  box-shadow: 4px 4px 0 var(--brutal-shadow);
+}
+
+/* Interactive cards: lift toward the light. */
+a[class*='bg-[var(--color-ink-soft)]'],
+div[class*='cursor-pointer'] {
+  transition:
+    transform 120ms steps(2, end),
+    box-shadow 120ms steps(2, end),
+    border-color 120ms;
+}
+
+a[class*='bg-[var(--color-ink-soft)]']:hover,
+div[class*='cursor-pointer']:hover {
+  transform: translate(-2px, -2px);
+  border-color: var(--brutal-lime);
+  box-shadow: 7px 7px 0 var(--brutal-lime);
+}
+
+/* ── Type ─────────────────────────────────────────────────── */
+
+h1,
+h2 {
+  text-transform: uppercase;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-weight: 700;
+}
+
+/* Long-form docs keep their human casing. */
+.doc-prose h1,
+.doc-prose h2 {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+
+button,
+.btn {
+  border-radius: 0 !important;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  transition:
+    transform 110ms steps(2, end),
+    box-shadow 110ms steps(2, end),
+    background-color 110ms;
+}
+
+button[class*='bg-'],
+button[class*='border-white/'],
+a[class*='bg-[var(--color-accent)]'],
+a[class*='border-white/'] {
+  border-width: 2px;
+  border-style: solid;
+}
+
+button[class*='border-white/'],
+a[class*='border-white/'] {
+  border-color: var(--brutal-line);
+  box-shadow: 3px 3px 0 var(--brutal-shadow);
+}
+
+button[class*='border-white/']:hover:not(:disabled),
+a[class*='border-white/']:hover {
+  transform: translate(-1px, -1px);
+  border-color: var(--brutal-lime);
+  box-shadow: 5px 5px 0 var(--brutal-lime);
+}
+
+button[class*='bg-[var(--color-accent)]'],
+a[class*='bg-[var(--color-accent)]'] {
+  color: #080807 !important;
+  border: 2px solid var(--brutal-paper);
+  box-shadow: 4px 4px 0 var(--brutal-paper);
+}
+
+button[class*='bg-[var(--color-accent)]']:hover:not(:disabled),
+a[class*='bg-[var(--color-accent)]']:hover {
+  transform: translate(-2px, -2px);
+  background: var(--brutal-hot) !important;
+  color: #080807 !important;
+  box-shadow: 7px 7px 0 var(--brutal-paper);
+}
+
+button[class*='bg-[var(--color-accent)]']:active:not(:disabled),
+a[class*='bg-[var(--color-accent)]']:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 transparent;
+}
+
+button:disabled,
+.btn:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── Inputs ───────────────────────────────────────────────── */
+
+input,
+select,
+textarea {
+  border-radius: 0 !important;
+  border: 2px solid var(--brutal-line) !important;
+  background: #0b0b0a !important;
+  color: var(--brutal-paper);
+  font-family: var(--font-mono);
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(242, 238, 227, 0.35);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--brutal-lime) !important;
+  box-shadow: 3px 3px 0 var(--brutal-lime);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brutal-lime);
+  outline-offset: 2px;
+}
+
+/* ── Little brutalist primitives ─────────────────────────── */
+
+.brutal-panel {
+  border: 2px solid var(--brutal-line-strong);
+  background: var(--color-ink);
+  box-shadow: 8px 8px 0 var(--brutal-lime);
+}
+
+.brutal-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brutal-lime);
+}
+
+.brutal-stamp {
+  display: inline-block;
+  border: 2px solid var(--brutal-lime);
+  padding: 0.2rem 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brutal-lime);
+  transform: rotate(-2deg);
+}
+
+.brutal-logo {
+  display: inline-block;
+  border: 2px solid var(--brutal-paper);
+  background: var(--brutal-paper);
+  color: #080807;
+  padding: 0.1rem 0.5rem 0.2rem;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  box-shadow: 4px 4px 0 var(--brutal-lime);
+}
+
+.brutal-logo span {
+  color: var(--brutal-hot);
+}
+
+.brutal-marquee {
+  display: flex;
+  width: max-content;
+  gap: 3rem;
+  padding: 0.3rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  animation: brutal-scroll 26s linear infinite;
+}
+
+@keyframes brutal-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brutal-marquee {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ── Scrollbars ───────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brutal-lime) #000;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--brutal-lime);
+  border: 2px solid #000;
 }
