@@ -190,13 +190,5 @@ Billing — GET .../billing/plans · GET .../billing/subscription · GET .../bil
 API Platform — GET|POST .../api-keys · DELETE .../api-keys/:keyId · GET|POST .../webhooks · PATCH|DELETE .../webhooks/:id · GET .../webhooks/:id/deliveries · GET .../webhook-events.
 
 </details>
-Built with 🖤 for software teams who are tired of context switching.
 
-text
-
-### Final Steps:
-Run these commands in PowerShell:
-```powershell
-git add README.md
-git commit -m "docs: merged technical architecture with strategic vision and MVP transparency"
-git push
+Built for software teams who are tired of context switching.
