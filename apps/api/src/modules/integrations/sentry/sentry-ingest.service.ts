@@ -188,10 +188,13 @@ export class SentryIngestService {
       where: { id: incident.id },
       data: { status: IncidentStatus.RESOLVED, resolvedAt: new Date() },
     });
+
     if (incident.issueId) {
-      await this.prisma.issue
-        .update({ where: { id: incident.issueId }, data: { status: IssueStatus.DONE } })
-        .catch(() => undefined);
+      // Removed the .catch() so we can see if it throws an error
+      await this.prisma.issue.update({
+        where: { id: incident.issueId },
+        data: { status: IssueStatus.DONE },
+      });
     }
 
     await this.prisma.monitor.update({
