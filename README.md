@@ -191,4 +191,4 @@ API Platform — GET|POST .../api-keys · DELETE .../api-keys/:keyId · GET|POST
 
 </details>
 
-Built for software teams who are tired of context switching.
+Built for software teams who are tired of context switching. 
